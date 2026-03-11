@@ -1,0 +1,64 @@
+{
+  "name": "taxes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.9.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/csmathguy/Taxes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/csmathguy/Taxes/issues"
+  },
+  "homepage": "https://github.com/csmathguy/Taxes#readme",
+  "engines": {
+    "node": ">=24.14.0",
+    "npm": ">=11.6.4"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "prepare": "simple-git-hooks",
+    "lint": "eslint apps packages tools/agent tools/quality vitest.config.ts --max-warnings=0",
+    "lint:fix": "eslint apps packages tools/agent tools/quality vitest.config.ts --fix",
+    "typecheck": "npm run typecheck:shared && npm run typecheck:api && npm run typecheck:web && npm run typecheck:quality",
+    "typecheck:api": "tsc --noEmit -p apps/api/tsconfig.json",
+    "typecheck:shared": "tsc --noEmit -p packages/shared/tsconfig.json",
+    "typecheck:web": "tsc --noEmit -p apps/web/tsconfig.json",
+    "typecheck:quality": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:arch": "vitest run tools/quality/architecture",
+    "quality": "npm run typecheck && npm run lint && npm run test",
+    "quality:changed": "tsx tools/agent/changed-quality.ts",
+    "quality:changed:staged": "tsx tools/agent/changed-quality.ts --staged --workflow pre-commit",
+    "quality:logged": "tsx tools/agent/quality-gates.ts",
+    "quality:logged:coverage": "tsx tools/agent/quality-gates.ts --with-coverage",
+    "workflow:start": "tsx tools/agent/workflow-log.ts start",
+    "workflow:note": "tsx tools/agent/workflow-log.ts note",
+    "workflow:end": "tsx tools/agent/workflow-log.ts end"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^25.4.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "archunit": "^2.1.63",
+    "eslint": "^9.39.4",
+    "eslint-plugin-security": "^4.0.0",
+    "eslint-plugin-sonarjs": "^4.0.2",
+    "globals": "^17.4.0",
+    "simple-git-hooks": "^2.13.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "vitest": "^4.0.18"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "node tools/runtime/run-npm.cjs run quality:changed:staged",
+    "pre-push": "node tools/runtime/run-npm.cjs run quality:logged -- pre-push"
+  }
+}

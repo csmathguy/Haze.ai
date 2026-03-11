@@ -1,0 +1,55 @@
+# Agent Guidelines
+
+## Repo-Level Pattern
+
+Use `AGENTS.md` for always-on rules that every coding agent should follow in this repository:
+
+- local-only privacy constraints
+- architecture boundaries
+- required validation workflow
+- workflow audit expectations
+- documentation update expectations
+
+Keep it short enough that an agent can apply it on every turn without loading unnecessary detail.
+
+## Nested Agent Files
+
+Use nested `AGENTS.md` files for local context where the rules differ by area:
+
+- `apps/api/AGENTS.md`
+- `apps/web/AGENTS.md`
+- `packages/shared/AGENTS.md`
+- `tools/AGENTS.md`
+
+This follows the pattern described by `agents.md`: the nearest applicable file should add local guidance instead of bloating the root file.
+
+## Project Skills
+
+This repository defines three local skills:
+
+- `implementation-workflow`
+  - use for implementation, refactor, testing, and architecture changes
+- `ui-design-workflow`
+  - use for frontend layout, forms, tables, charts, and MUI usage
+- `workflow-audit`
+  - use for audited workflow start/end logging and deterministic guardrail execution
+
+Each skill keeps the core workflow in `SKILL.md` and pushes extra detail into `references/` so the agent only loads more context when needed.
+
+## Skill Design Rules
+
+- Keep `SKILL.md` focused on trigger conditions, workflow, and a few critical decisions.
+- Put long checklists and detailed standards in `references/`.
+- Prefer project-specific guardrails over generic advice the model already knows.
+- Add `agents/openai.yaml` so the skill is discoverable in tools that support UI metadata.
+
+## Curated Skills Worth Watching
+
+The current curated catalog includes `figma` and `figma-implement-design`. Those are relevant reference points for future design workflows, but they are not installed here because this project does not yet depend on Figma assets.
+
+## Public Patterns Worth Reusing
+
+- keep skills focused and composable rather than turning one skill into a full playbook
+- keep `SKILL.md` short and move detail into `references/`
+- wrap repeatable command sequences in scripts instead of relying on the model to reproduce them from memory
+- prefer structured logs over free-form notes when you want auditability

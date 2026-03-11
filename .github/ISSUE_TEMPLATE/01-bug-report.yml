@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a defect in the repo tooling, API, or web app behavior.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Provide a focused reproduction. Never attach private tax documents, generated filings, or raw extracted data.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the defect and the expected behavior.
+      placeholder: A concise defect description.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: List the steps needed to reproduce the issue.
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation context
+      description: Include the command output or audit run folder if relevant.
+      placeholder: node tools/runtime/run-npm.cjs run quality:changed -- ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Provide OS, Node version, and any relevant repo context.
+      placeholder: Windows 11, Node 24.14.0, main branch
+    validations:
+      required: true

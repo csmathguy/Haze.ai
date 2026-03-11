@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose a product, architecture, or workflow enhancement.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep requests outcome-focused. If the request affects private tax data handling, describe the workflow without pasting real data.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user or engineering problem should this change address?
+      placeholder: The current workflow makes it hard to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Describe the desired behavior, boundaries, and any technology preferences.
+      placeholder: We should add ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and constraints
+      description: Note privacy, architecture, performance, or maintenance concerns.
+      placeholder: This must stay local-only and should not ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List the conditions that make the change complete.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
