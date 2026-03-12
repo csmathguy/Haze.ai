@@ -73,6 +73,22 @@ Researched on March 11, 2026.
 - OpenAI curated `figma-implement-design` skill: https://github.com/openai/skills/tree/main/skills/.curated/figma-implement-design
 - OpenAI curated skills catalog checked via local `skill-installer` helper on March 11, 2026
 
+## Documentation Writing And Structure
+
+- Google developer documentation style guide: https://developers.google.com/style
+- Google Technical Writing One summary: https://developers.google.com/tech-writing/course-summaries/one
+- Google Technical Writing, "Paragraphs": https://developers.google.com/tech-writing/one/paragraphs
+- Microsoft Style Guide, "Lists": https://learn.microsoft.com/en-us/style-guide/scannable-content/lists
+- Microsoft Style Guide, "Tables": https://learn.microsoft.com/en-us/style-guide/scannable-content/tables
+- Microsoft Style Guide, punctuation checklist: https://learn.microsoft.com/en-us/style-guide/checklists/punctuation-checklist
+- Diataxis documentation framework: https://diataxis.fr/
+
+## Tax Research Authority Notes
+
+- IRS, taxpayer reliance on guidance published in the Internal Revenue Bulletin and FAQs: https://www.irs.gov/newsroom/general-overview-of-taxpayer-reliance-on-guidance-published-in-the-internal-revenue-bulletin-and-faqs
+- U.S. House, Title 26 downloads and historical archives: https://uscode.house.gov/download/download.shtml
+- U.S. House, Title 26 overview page: https://uscode.house.gov/view.xhtml?edition=prelim&f=treesort&num=4117&req=internal+revenue+code
+
 ## Git Hooks And Local Workflow Automation
 
 - simple-git-hooks package: https://github.com/toplenboren/simple-git-hooks

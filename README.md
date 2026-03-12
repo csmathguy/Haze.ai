@@ -7,6 +7,7 @@ Local-first tax workflow application for ingesting private tax documents, extrac
 This repository now has an initial working scaffold. The current deliverables are:
 - repository guidance in `AGENTS.md`
 - stack and workflow documentation in `docs/`
+- documentation writing standards in `docs/documentation-standards.md`
 - project-local agent skills in `skills/`
 - a Fastify API scaffold in `apps/api`
 - a Vite + React + MUI web scaffold in `apps/web`
@@ -69,4 +70,5 @@ tools/arch/   architecture rule configuration
 - `docs/github-repository.md`
 - `docs/agent-guidelines.md`
 - `docs/agent-observability.md`
+- `docs/documentation-standards.md`
 - `docs/research-sources.md`
