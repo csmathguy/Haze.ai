@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { AUDIT_ROOT, ensureAuditPaths, getActiveRunId, readSummary, type AuditSummary } from "./lib/audit.js";
 import {
   buildPullRequestBody,
-  collectValidationCommands
+  collectValidationCommandsFromSummaries
 } from "./lib/pull-request-publish.js";
 import { buildPullRequestDraft } from "./lib/pull-request-draft.js";
 
@@ -29,14 +29,14 @@ async function main(): Promise<void> {
 
   const files = getChangedFiles(compareRef);
   const draft = buildPullRequestDraft(files);
-  const summary = await resolveWorkflowSummary(options.workflow);
-  const validationCommands = collectValidationCommands(summary);
   const title = options.title ?? options.summary;
   const body = buildPullRequestBody({
     draft,
     privacyConfirmed: options.privacyConfirmed,
     summary: options.summary,
-    validationCommands,
+    validationCommands: collectValidationCommandsFromSummaries(
+      options.dryRun ? await resolveValidationSummaries(options.workflow) : await pushAndResolveValidationSummaries(branch, options.workflow)
+    ),
     value: options.value
   });
 
@@ -44,8 +44,6 @@ async function main(): Promise<void> {
     process.stdout.write(`${title}\n\n${body}\n`);
     return;
   }
-
-  pushBranch(branch);
 
   const openPullRequest = findOpenPullRequest(branch);
   const bodyPath = path.resolve("artifacts", "pull-request-sync-body.md");
@@ -262,6 +260,32 @@ function findOpenPullRequest(branch: string): { number: number; url: string } | 
   const pullRequests = JSON.parse(stdout) as { number: number; url: string }[];
 
   return pullRequests[0] ?? null;
+}
+
+async function resolveValidationSummaries(workflow: string): Promise<Pick<AuditSummary, "steps">[]> {
+  const summaries: Pick<AuditSummary, "steps">[] = [];
+
+  for (const candidateWorkflow of getValidationWorkflowNames(workflow)) {
+    const summary = await resolveWorkflowSummary(candidateWorkflow);
+
+    if (summary !== null) {
+      summaries.push(summary);
+    }
+  }
+
+  return summaries;
+}
+
+async function pushAndResolveValidationSummaries(
+  branch: string,
+  workflow: string
+): Promise<Pick<AuditSummary, "steps">[]> {
+  pushBranch(branch);
+  return resolveValidationSummaries(workflow);
+}
+
+function getValidationWorkflowNames(primaryWorkflow: string): string[] {
+  return [...new Set([primaryWorkflow, "changed-quality", "pre-commit", "pre-push"])];
 }
 
 async function resolveWorkflowSummary(workflow: string): Promise<Pick<AuditSummary, "steps"> | null> {

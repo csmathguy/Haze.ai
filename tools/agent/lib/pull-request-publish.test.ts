@@ -5,6 +5,7 @@ import { buildPullRequestDraft } from "./pull-request-draft.js";
 import {
   buildPullRequestBody,
   collectValidationCommands,
+  collectValidationCommandsFromSummaries,
   getCompletionRequirements
 } from "./pull-request-publish.js";
 
@@ -77,6 +78,53 @@ describe("collectValidationCommands", () => {
     expect(collectValidationCommands(summary)).toEqual([
       "node tools/runtime/run-npm.cjs run quality:changed -- package.json",
       "node tools/runtime/run-npm.cjs run pr:draft -- --staged"
+    ]);
+  });
+});
+
+describe("collectValidationCommandsFromSummaries", () => {
+  it("merges commands from multiple workflow summaries without duplicates", () => {
+    const summaries = [
+      {
+        steps: [
+          {
+            command: ["node", "tools/runtime/run-npm.cjs", "run", "quality:changed", "--", "package.json"],
+            durationMs: 1,
+            exitCode: 0,
+            logFile: "logs/quality.log",
+            startedAt: "2026-03-11T20:00:00.000Z",
+            status: "success",
+            step: "quality-changed"
+          }
+        ]
+      },
+      {
+        steps: [
+          {
+            command: ["node", "tools/runtime/run-npm.cjs", "run", "quality:logged", "--", "pre-push"],
+            durationMs: 1,
+            exitCode: 0,
+            logFile: "logs/pre-push.log",
+            startedAt: "2026-03-11T20:01:00.000Z",
+            status: "success",
+            step: "quality-logged"
+          },
+          {
+            command: ["node", "tools/runtime/run-npm.cjs", "run", "quality:changed", "--", "package.json"],
+            durationMs: 1,
+            exitCode: 0,
+            logFile: "logs/quality-duplicate.log",
+            startedAt: "2026-03-11T20:02:00.000Z",
+            status: "success",
+            step: "quality-changed-duplicate"
+          }
+        ]
+      }
+    ] satisfies Pick<AuditSummary, "steps">[];
+
+    expect(collectValidationCommandsFromSummaries(summaries)).toEqual([
+      "node tools/runtime/run-npm.cjs run quality:changed -- package.json",
+      "node tools/runtime/run-npm.cjs run quality:logged -- pre-push"
     ]);
   });
 });

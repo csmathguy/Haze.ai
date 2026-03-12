@@ -61,13 +61,25 @@ export function buildPullRequestBody(input: PullRequestBodyInput): string {
 }
 
 export function collectValidationCommands(summary: Pick<AuditSummary, "steps"> | null): string[] {
-  if (summary === null) {
-    return [];
-  }
+  return collectValidationCommandsFromSummaries(summary === null ? [] : [summary]);
+}
 
+export function collectValidationCommandsFromSummaries(summaries: Pick<AuditSummary, "steps">[]): string[] {
   const seen = new Set<string>();
   const commands: string[] = [];
 
+  for (const summary of summaries) {
+    appendUniqueValidationCommands(summary, seen, commands);
+  }
+
+  return commands;
+}
+
+function appendUniqueValidationCommands(
+  summary: Pick<AuditSummary, "steps">,
+  seen: Set<string>,
+  commands: string[]
+): void {
   for (const step of summary.steps) {
     const command = step.command.join(" ").trim();
 
@@ -78,8 +90,6 @@ export function collectValidationCommands(summary: Pick<AuditSummary, "steps"> |
     seen.add(command);
     commands.push(command);
   }
-
-  return commands;
 }
 
 export function getCompletionRequirements(input: {
