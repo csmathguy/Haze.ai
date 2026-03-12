@@ -9,6 +9,8 @@
 - Use `skills/implementation-workflow` for code changes, refactors, tests, build tooling, or architecture work.
 - Use `skills/ui-design-workflow` for frontend UX, component design, charting, layout, accessibility, or MUI theming work.
 - Use `skills/workflow-audit` when a task needs explicit workflow start/end logging, audited command execution, or a reviewable command trail.
+- Use `skills/parallel-work-orchestrator` when work should be split into multiple agents or worktrees.
+- Use `skills/parallel-work-implementer` when an agent is executing one bounded slice inside its own worktree.
 
 ## Required Workflow
 1. Read the relevant docs in `docs/` before making non-trivial changes.

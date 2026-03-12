@@ -8,6 +8,7 @@ This repository now has an initial working scaffold. The current deliverables ar
 - repository guidance in `AGENTS.md`
 - stack and workflow documentation in `docs/`
 - project-local agent skills in `skills/`
+- managed worktree tooling for parallel agent slices in `tools/agent`
 - a Fastify API scaffold in `apps/api`
 - a Vite + React + MUI web scaffold in `apps/web`
 - shared tax-domain contracts in `packages/shared`
@@ -39,6 +40,7 @@ tools/arch/   architecture rule configuration
 - `npm run prisma:migrate:deploy`
 - `npm run quality`
 - `npm run quality:changed -- <files...>`
+- `npm run agent:worktree:create -- --task <id> --summary "<summary>" --scope <path>`
 - `node tools/runtime/run-npm.cjs run <script>` when the shell default Node version does not match `.nvmrc`
 - git hooks via `simple-git-hooks`:
   - `pre-commit`: changed-file guardrails
@@ -69,4 +71,5 @@ tools/arch/   architecture rule configuration
 - `docs/github-repository.md`
 - `docs/agent-guidelines.md`
 - `docs/agent-observability.md`
+- `docs/parallel-agent-orchestration.md`
 - `docs/research-sources.md`

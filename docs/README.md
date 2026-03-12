@@ -12,4 +12,5 @@
 - `security-and-privacy.md`: local-only handling, storage, and redaction rules
 - `agent-guidelines.md`: AGENTS.md and skill patterns for this repository
 - `agent-observability.md`: audit logging, workflow wrappers, and command traces
+- `parallel-agent-orchestration.md`: multi-agent slicing, worktree, and conflict-management guidance
 - `research-sources.md`: source list for the guidance in this folder

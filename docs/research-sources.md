@@ -65,13 +65,20 @@ Researched on March 11, 2026.
 
 - Agents.md project: https://agents.md/
 - Agents.md docs, nested agent files and closest-file behavior: https://agents.md/
+- OpenAI Codex docs, AGENTS.md: https://developers.openai.com/codex/agents.md
+- OpenAI Codex docs, multi-agents: https://developers.openai.com/codex/multi-agents
+- OpenAI Codex docs, skills: https://developers.openai.com/codex/skills
 - Anthropic Claude Code memory docs: https://docs.anthropic.com/en/docs/claude-code/memory
 - Anthropic Claude Code hooks docs: https://docs.anthropic.com/en/docs/claude-code/hooks
+- Anthropic Claude Code subagents docs: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+- Anthropic engineering, Claude Code best practices: https://www.anthropic.com/engineering/claude-code-best-practices
 - OpenAI Codex repository docs: https://github.com/openai/codex
 - OpenAI skills catalog: https://github.com/openai/skills
 - OpenAI curated `figma` skill: https://github.com/openai/skills/tree/main/skills/.curated/figma
 - OpenAI curated `figma-implement-design` skill: https://github.com/openai/skills/tree/main/skills/.curated/figma-implement-design
 - OpenAI curated skills catalog checked via local `skill-installer` helper on March 11, 2026
+- Git worktree docs: https://git-scm.com/docs/git-worktree
+- GitHub Docs, merge queue: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue
 
 ## Git Hooks And Local Workflow Automation
 
