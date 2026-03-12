@@ -11,6 +11,7 @@
 - Use `skills/workflow-audit` when a task needs explicit workflow start/end logging, audited command execution, or a reviewable command trail.
 - Use `skills/parallel-work-orchestrator` when work should be split into multiple agents or worktrees.
 - Use `skills/parallel-work-implementer` when an agent is executing one bounded slice inside its own worktree.
+- Use `skills/research-agent` when a task needs external research, source comparison, documentation best-practice review, or tax-law research planning with dated citations.
 
 ## Required Workflow
 1. Read the relevant docs in `docs/` before making non-trivial changes.
@@ -44,6 +45,7 @@
 - Default to offline-capable libraries and local storage paths outside the repository for private files.
 
 ## Documentation
+- Use `docs/documentation-standards.md` when writing or restructuring long-lived docs or skill references.
 - Keep `docs/research-sources.md` current when adding or replacing major stack guidance.
 - Update the closest architecture or workflow doc when implementation decisions change.
 - Keep `.nvmrc` and `package.json` engine versions aligned with the validated local toolchain.
