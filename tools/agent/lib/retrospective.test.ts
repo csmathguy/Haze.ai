@@ -4,7 +4,7 @@ import * as path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { AuditEvent, AuditSummary } from "./audit.js";
+import type { AuditEvent, AuditExecutionSummary, AuditSummary } from "./audit.js";
 import { buildRetrospectiveMarkdown, createRetrospectiveArtifact, resolveRetrospectivePaths } from "./retrospective.js";
 
 const temporaryDirectories: string[] = [];
@@ -86,13 +86,27 @@ afterEach(async () => {
 });
 
 function createSummary(): AuditSummary {
+  const executions = createExecutions();
+
   return {
     actor: "csmat",
     completedAt: "2026-03-11T23:48:31.953Z",
     cwd: "C:\\Users\\csmat\\source\\repos\\Taxes",
     durationMs: 6386464,
+    executions,
     runId: "2026-03-11T180205-485-implementation-5cc22a65",
     startedAt: "2026-03-11T22:02:05.489Z",
+    stats: {
+      byKind: {
+        command: executions.length
+      },
+      byStatus: {
+        failed: 2,
+        success: 1
+      },
+      executionCount: executions.length,
+      failedExecutionCount: 2
+    },
     status: "success",
     steps: [
       {
@@ -146,8 +160,11 @@ function createEvents(runId: string): AuditEvent[] {
       command: ["npm", "run", "lint"],
       cwd: "C:\\Users\\csmat\\source\\repos\\Taxes",
       durationMs: 22000,
+      executionId: "lint-failed-execution",
+      executionKind: "command",
+      executionName: "lint",
       eventId: "lint-failed",
-      eventType: "command-end",
+      eventType: "execution-end",
       exitCode: 1,
       logFile: "C:\\Users\\csmat\\source\\repos\\Taxes\\artifacts\\audit\\2026-03-11\\2026-03-11T180205-485-implementation-5cc22a65\\logs\\lint.log",
       runId,
@@ -178,6 +195,47 @@ function createEvents(runId: string): AuditEvent[] {
       status: "success",
       timestamp: "2026-03-11T23:48:31.956Z",
       workflow: "implementation"
+    }
+  ];
+}
+
+function createExecutions(): AuditExecutionSummary[] {
+  return [
+    {
+      command: ["npm", "run", "lint"],
+      durationMs: 22000,
+      executionId: "lint-failed-execution",
+      exitCode: 1,
+      kind: "command",
+      logFile: "C:\\Users\\csmat\\source\\repos\\Taxes\\artifacts\\audit\\2026-03-11\\2026-03-11T180205-485-implementation-5cc22a65\\logs\\lint.log",
+      name: "lint",
+      startedAt: "2026-03-11T22:27:14.982Z",
+      status: "failed",
+      step: "lint"
+    },
+    {
+      command: ["npm", "run", "lint"],
+      durationMs: 34000,
+      executionId: "lint-success-execution",
+      exitCode: 0,
+      kind: "command",
+      logFile: "C:\\Users\\csmat\\source\\repos\\Taxes\\artifacts\\audit\\2026-03-11\\2026-03-11T180205-485-implementation-5cc22a65\\logs\\lint.log",
+      name: "lint",
+      startedAt: "2026-03-11T22:33:14.669Z",
+      status: "success",
+      step: "lint"
+    },
+    {
+      command: ["npm", "run", "test:coverage"],
+      durationMs: 107646,
+      executionId: "coverage-failed-execution",
+      exitCode: 1,
+      kind: "command",
+      logFile: "C:\\Users\\csmat\\source\\repos\\Taxes\\artifacts\\audit\\2026-03-11\\2026-03-11T180205-485-implementation-5cc22a65\\logs\\test-coverage.log",
+      name: "test-coverage",
+      startedAt: "2026-03-11T22:33:51.413Z",
+      status: "failed",
+      step: "test-coverage"
     }
   ];
 }

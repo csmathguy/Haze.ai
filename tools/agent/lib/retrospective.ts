@@ -2,13 +2,8 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 
-import {
-  AUDIT_ROOT,
-  getAuditDateSegment,
-  type AuditEvent,
-  type AuditStepSummary,
-  type AuditSummary
-} from "./audit.js";
+import { AUDIT_ROOT, getAuditDateSegment, type AuditEvent, type AuditStepSummary, type AuditSummary } from "./audit.js";
+import { buildTimelineEntries, type TimelineEntry } from "./retrospective-timeline.js";
 
 export const RETROSPECTIVE_ROOT = path.resolve("artifacts", "retrospectives");
 
@@ -39,17 +34,6 @@ interface RetrySummary {
   recovered: boolean;
   step: string;
 }
-
-interface TimelineEntry {
-  message: string;
-  timestamp: string;
-}
-
-type TimelineEntryBuilder = (
-  event: AuditEvent,
-  failedAttemptsByStep: Map<string, number>,
-  runDir: string
-) => TimelineEntry | null;
 
 export async function createRetrospectiveArtifact(
   runId: string,
@@ -125,6 +109,7 @@ export function buildRetrospectiveMarkdown(run: LoadedAuditRun, now: Date = new 
     "## Evidence Snapshot",
     `- Command attempts: ${String(run.summary.steps.length)}`,
     `- Failed attempts: ${String(failedSteps.length)}`,
+    `- Executions recorded: ${String(run.summary.stats.executionCount)} total, ${String(run.summary.stats.failedExecutionCount)} failed`,
     `- Unique steps: ${uniqueSteps.length === 0 ? "none" : uniqueSteps.join(", ")}`,
     `- Longest steps: ${formatLongestSteps(longestSteps)}`,
     `- Repeated steps: ${formatRetrySummaries(repeatedSteps)}`,
@@ -234,84 +219,6 @@ function collectWorkflowNotes(events: AuditEvent[]): TimelineEntry[] {
       return typeof message === "string" ? [{ message, timestamp: event.timestamp }] : [];
     });
 }
-
-function buildTimelineEntries(events: AuditEvent[], runDir: string): TimelineEntry[] {
-  const failedAttemptsByStep = new Map<string, number>();
-  return events
-    .flatMap((event) => {
-      const entry = toTimelineEntry(event, failedAttemptsByStep, runDir);
-      return entry === null ? [] : [entry];
-    })
-    .slice(0, 10);
-}
-
-function toTimelineEntry(
-  event: AuditEvent,
-  failedAttemptsByStep: Map<string, number>,
-  runDir: string
-): TimelineEntry | null {
-  const builder = TIMELINE_ENTRY_BUILDERS[event.eventType];
-  return builder(event, failedAttemptsByStep, runDir);
-}
-
-function formatLogPath(logFile: string | undefined, runDir: string): string {
-  if (logFile === undefined) {
-    return "the related command log";
-  }
-
-  return `\`${toPortablePath(path.relative(runDir, logFile))}\``;
-}
-
-function createWorkflowStartEntry(event: AuditEvent): TimelineEntry {
-  return {
-    message: event.task === undefined ? "Workflow started." : `Workflow started for "${event.task}".`,
-    timestamp: event.timestamp
-  };
-}
-
-function createWorkflowNoteEntry(event: AuditEvent): TimelineEntry | null {
-  const message = event.metadata?.message;
-
-  return typeof message === "string"
-    ? {
-        message: `Workflow note: ${message}.`,
-        timestamp: event.timestamp
-      }
-    : null;
-}
-
-function createFailedCommandEntry(
-  event: AuditEvent,
-  failedAttemptsByStep: Map<string, number>,
-  runDir: string
-): TimelineEntry | null {
-  if (event.status !== "failed" || event.step === undefined) {
-    return null;
-  }
-
-  const attempt = (failedAttemptsByStep.get(event.step) ?? 0) + 1;
-  failedAttemptsByStep.set(event.step, attempt);
-
-  return {
-    message: `${event.step} failed on attempt ${String(attempt)} after ${formatDuration(event.durationMs)}. Review ${formatLogPath(event.logFile, runDir)}.`,
-    timestamp: event.timestamp
-  };
-}
-
-function createWorkflowEndEntry(event: AuditEvent): TimelineEntry {
-  return {
-    message: `Workflow ended with status ${event.status ?? "unknown"}.`,
-    timestamp: event.timestamp
-  };
-}
-
-const TIMELINE_ENTRY_BUILDERS: Record<AuditEvent["eventType"], TimelineEntryBuilder> = {
-  "command-end": (event, failedAttemptsByStep, runDir) => createFailedCommandEntry(event, failedAttemptsByStep, runDir),
-  "command-start": () => null,
-  "workflow-end": (event) => createWorkflowEndEntry(event),
-  "workflow-note": (event) => createWorkflowNoteEntry(event),
-  "workflow-start": (event) => createWorkflowStartEntry(event)
-};
 
 function formatLongestSteps(steps: AuditStepSummary[]): string {
   if (steps.length === 0) {
