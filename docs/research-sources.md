@@ -72,6 +72,9 @@ Researched on March 11, 2026.
 - OpenAI curated `figma` skill: https://github.com/openai/skills/tree/main/skills/.curated/figma
 - OpenAI curated `figma-implement-design` skill: https://github.com/openai/skills/tree/main/skills/.curated/figma-implement-design
 - OpenAI curated skills catalog checked via local `skill-installer` helper on March 11, 2026
+- Microsoft Learn, "Semantic Kernel Filters": https://learn.microsoft.com/en-us/semantic-kernel/concepts/enterprise-readiness/filters
+- Microsoft Learn, "Function Invocation": https://learn.microsoft.com/en-us/semantic-kernel/concepts/ai-services/chat-completion/function-calling/function-invocation
+- Microsoft Learn, "Semantic Kernel Components": https://learn.microsoft.com/en-us/semantic-kernel/concepts/semantic-kernel-components
 
 ## Documentation Writing And Structure
 
