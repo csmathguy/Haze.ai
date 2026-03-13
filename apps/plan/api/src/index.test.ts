@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
 import type { PlanningWorkspace } from "@taxes/shared";
 
@@ -32,6 +34,28 @@ describe("plan buildApp", () => {
     expect(payload.workspace.workItems).toEqual([]);
 
     await app.close();
+  });
+
+  it("creates a planning workspace when started from the app workspace directory", async () => {
+    const originalWorkingDirectory = process.cwd();
+    const appWorkingDirectory = path.resolve(originalWorkingDirectory, "apps", "plan", "api");
+
+    process.chdir(appWorkingDirectory);
+
+    try {
+      const workspace = await createTestPlanningContext("plan-build-app-cwd");
+      workspaces.push(workspace);
+      const app = await buildApp(workspace);
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/planning/workspace"
+      });
+
+      expect(response.statusCode).toBe(200);
+      await app.close();
+    } finally {
+      process.chdir(originalWorkingDirectory);
+    }
   });
 
   it("creates a work item with checklist data and plan steps", async () => {
