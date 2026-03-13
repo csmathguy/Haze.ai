@@ -1,20 +1,17 @@
 import { mkdir } from "node:fs/promises";
-import { createRequire } from "node:module";
 import * as path from "node:path";
 
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import type { PrismaClient as PrismaClientType } from "@prisma/client";
+import * as PrismaClientModule from "@prisma/client";
 
 import { AUDIT_DATABASE_URL } from "../config.js";
 
 const SQLITE_FILE_PREFIX = "file:";
-type PrismaClientConstructor = new (...args: unknown[]) => PrismaClientType;
+const { PrismaClient } = PrismaClientModule;
+type AuditPrismaClient = InstanceType<typeof PrismaClient>;
+const clients = new Map<string, AuditPrismaClient>();
 
-const require = createRequire(import.meta.url);
-const { PrismaClient } = require("@prisma/client") as { PrismaClient: PrismaClientConstructor };
-const clients = new Map<string, PrismaClientType>();
-
-export async function getAuditPrismaClient(databaseUrl: string = AUDIT_DATABASE_URL): Promise<PrismaClientType> {
+export async function getAuditPrismaClient(databaseUrl: string = AUDIT_DATABASE_URL) {
   const existingClient = clients.get(databaseUrl);
 
   if (existingClient !== undefined) {
