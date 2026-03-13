@@ -246,7 +246,8 @@ async function handleSeedMvp(): Promise<{ createdWorkItems: string[]; totalWorkI
 }
 
 function stripSeedStatus(item: SeedWorkItem): CreateWorkItemInput {
-  const { status: _status, ...createInput } = item;
+  const createInput = { ...item };
+  delete createInput.status;
 
   return createInput;
 }
