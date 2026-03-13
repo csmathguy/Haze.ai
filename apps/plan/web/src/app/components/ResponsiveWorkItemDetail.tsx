@@ -1,16 +1,9 @@
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import {
-  Drawer,
-  IconButton,
-  Stack,
-  Typography
-} from "@mui/material";
 import type { WorkItem, WorkItemStatus } from "@taxes/shared";
 
+import { PlanningSurfaceDrawer } from "./PlanningSurfaceDrawer.js";
 import { WorkItemDetail } from "./WorkItemDetail.js";
 
 interface ResponsiveWorkItemDetailProps {
-  readonly mobile: boolean;
   readonly onClose: () => void;
   readonly onCriterionToggle: (criterionId: string, isPassed: boolean) => Promise<void>;
   readonly onStatusChange: (status: WorkItemStatus) => Promise<void>;
@@ -20,7 +13,6 @@ interface ResponsiveWorkItemDetailProps {
 }
 
 export function ResponsiveWorkItemDetail({
-  mobile,
   onClose,
   onCriterionToggle,
   onStatusChange,
@@ -28,50 +20,23 @@ export function ResponsiveWorkItemDetail({
   open,
   workItem
 }: ResponsiveWorkItemDetailProps) {
-  if (!mobile) {
-    return (
-      <Stack sx={{ position: { lg: "sticky" }, top: { lg: 24 } }}>
-        <WorkItemDetail
-          onCriterionToggle={onCriterionToggle}
-          onStatusChange={onStatusChange}
-          onTaskToggle={onTaskToggle}
-          workItem={workItem}
-        />
-      </Stack>
-    );
-  }
-
   return (
-    <Drawer
-      ModalProps={{ keepMounted: true }}
-      slotProps={{
-        paper: {
-          sx: {
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            maxHeight: "88vh",
-            p: 2.5
-          }
-        }
-      }}
-      anchor="bottom"
+    <PlanningSurfaceDrawer
+      description={
+        workItem === null
+          ? "Pick a card from the board to inspect tasks, criteria, and plan steps."
+          : "Review tasks, criteria, and the latest plan without leaving the board."
+      }
       onClose={onClose}
       open={open && workItem !== null}
+      title={workItem?.title ?? "Work item detail"}
     >
-      <Stack spacing={2}>
-        <Stack alignItems="center" direction="row" justifyContent="space-between" spacing={2}>
-          <Typography variant="h3">Work item detail</Typography>
-          <IconButton aria-label="Close work item detail" onClick={onClose}>
-            <CloseRoundedIcon />
-          </IconButton>
-        </Stack>
-        <WorkItemDetail
-          onCriterionToggle={onCriterionToggle}
-          onStatusChange={onStatusChange}
-          onTaskToggle={onTaskToggle}
-          workItem={workItem}
-        />
-      </Stack>
-    </Drawer>
+      <WorkItemDetail
+        onCriterionToggle={onCriterionToggle}
+        onStatusChange={onStatusChange}
+        onTaskToggle={onTaskToggle}
+        workItem={workItem}
+      />
+    </PlanningSurfaceDrawer>
   );
 }

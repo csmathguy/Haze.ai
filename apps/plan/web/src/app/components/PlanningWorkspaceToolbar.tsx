@@ -31,7 +31,7 @@ export function PlanningWorkspaceToolbar({
     >
       <Stack spacing={0.5}>
         <Typography color="text.secondary">
-          Review the backlog in one place and open focused surfaces only when you need to create or inspect work.
+          Review the backlog as a board and open focused drawers only when you need to create or inspect work.
         </Typography>
         <Typography color="text.secondary" variant="body2">
           {totalVisibleItems.toString()} item(s) in the current scope.

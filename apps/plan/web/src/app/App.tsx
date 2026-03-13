@@ -132,8 +132,8 @@ function useSelectedWorkItem(workItems: PlanningWorkspace["workItems"]) {
       return;
     }
 
-    if (selectedWorkItemId === null || workItems.every((item) => item.id !== selectedWorkItemId)) {
-      setSelectedWorkItemId(workItems[0]?.id ?? null);
+    if (selectedWorkItemId !== null && workItems.every((item) => item.id !== selectedWorkItemId)) {
+      setSelectedWorkItemId(null);
     }
   }, [selectedWorkItemId, workItems]);
 

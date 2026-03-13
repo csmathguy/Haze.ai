@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { Alert, CircularProgress, Grid, Stack, useMediaQuery } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { Alert, CircularProgress, Stack } from "@mui/material";
 import type { CreateWorkItemDraftInput, PlanningWorkspace, WorkItemStatus } from "@taxes/shared";
 
 import { CreateWorkItemDrawer } from "./CreateWorkItemDrawer.js";
 import { PlanningWorkspaceToolbar } from "./PlanningWorkspaceToolbar.js";
 import { ResponsiveWorkItemDetail } from "./ResponsiveWorkItemDetail.js";
-import { WorkItemList } from "./WorkItemList.js";
+import { WorkItemBoard } from "./WorkItemBoard.js";
 import { WorkspaceSummary } from "./WorkspaceSummary.js";
 
 interface PlanningWorkspaceStateProps {
@@ -40,16 +39,14 @@ export function PlanningWorkspaceState({
   visibleWorkItems,
   workspace
 }: PlanningWorkspaceStateProps) {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (selectedWorkItem === null) {
       setIsDetailDrawerOpen(false);
     }
-  }, [isMobile]);
+  }, [selectedWorkItem]);
 
   if (isBusy) {
     return (
@@ -75,7 +72,6 @@ export function PlanningWorkspaceState({
       handleTaskToggle={handleTaskToggle}
       isCreateDrawerOpen={isCreateDrawerOpen}
       isDetailDrawerOpen={isDetailDrawerOpen}
-      isMobile={isMobile}
       projects={projects}
       selectedProjectKey={selectedProjectKey}
       selectedWorkItem={selectedWorkItem}
@@ -93,7 +89,6 @@ export function PlanningWorkspaceState({
 interface PlanningWorkspaceReadyStateProps extends Omit<PlanningWorkspaceStateProps, "isBusy" | "workspace"> {
   readonly isCreateDrawerOpen: boolean;
   readonly isDetailDrawerOpen: boolean;
-  readonly isMobile: boolean;
   readonly setIsCreateDrawerOpen: (open: boolean) => void;
   readonly setIsDetailDrawerOpen: (open: boolean) => void;
   readonly workspace: PlanningWorkspace;
@@ -106,7 +101,6 @@ function PlanningWorkspaceReadyState({
   handleTaskToggle,
   isCreateDrawerOpen,
   isDetailDrawerOpen,
-  isMobile,
   projects,
   selectedProjectKey,
   selectedWorkItem,
@@ -153,7 +147,6 @@ function PlanningWorkspaceReadyState({
         handleStatusChange={handleStatusChange}
         handleTaskToggle={handleTaskToggle}
         isDetailDrawerOpen={isDetailDrawerOpen}
-        isMobile={isMobile}
         selectedWorkItem={selectedWorkItem}
         selectedWorkItemId={selectedWorkItemId}
         setIsDetailDrawerOpen={setIsDetailDrawerOpen}
@@ -169,7 +162,6 @@ interface PlanningWorkspaceBodyProps {
   readonly handleStatusChange: (status: WorkItemStatus) => Promise<void>;
   readonly handleTaskToggle: (taskId: string, checked: boolean) => Promise<void>;
   readonly isDetailDrawerOpen: boolean;
-  readonly isMobile: boolean;
   readonly selectedWorkItem: PlanningWorkspace["workItems"][number] | null;
   readonly selectedWorkItemId: string | null;
   readonly setIsDetailDrawerOpen: (open: boolean) => void;
@@ -182,7 +174,6 @@ function PlanningWorkspaceBody({
   handleStatusChange,
   handleTaskToggle,
   isDetailDrawerOpen,
-  isMobile,
   selectedWorkItem,
   selectedWorkItemId,
   setIsDetailDrawerOpen,
@@ -191,49 +182,24 @@ function PlanningWorkspaceBody({
 }: PlanningWorkspaceBodyProps) {
   return (
     <>
-      <Grid container spacing={2}>
-        <Grid size={{ lg: 5, xs: 12 }}>
-          <WorkItemList
-            onSelect={(workItemId) => {
-              setSelectedWorkItemId(workItemId);
-
-              if (isMobile) {
-                setIsDetailDrawerOpen(true);
-              }
-            }}
-            selectedWorkItemId={selectedWorkItemId}
-            workItems={visibleWorkItems}
-          />
-        </Grid>
-        {!isMobile ? (
-          <Grid size={{ lg: 7, xs: 12 }}>
-            <ResponsiveWorkItemDetail
-              mobile={false}
-              onClose={() => {
-                setIsDetailDrawerOpen(false);
-              }}
-              onCriterionToggle={handleCriterionToggle}
-              onStatusChange={handleStatusChange}
-              onTaskToggle={handleTaskToggle}
-              open
-              workItem={selectedWorkItem}
-            />
-          </Grid>
-        ) : null}
-      </Grid>
-      {isMobile ? (
-        <ResponsiveWorkItemDetail
-          mobile
+      <WorkItemBoard
+        onSelect={(workItemId) => {
+          setSelectedWorkItemId(workItemId);
+          setIsDetailDrawerOpen(true);
+        }}
+        selectedWorkItemId={selectedWorkItemId}
+        workItems={visibleWorkItems}
+      />
+      <ResponsiveWorkItemDetail
           onClose={() => {
             setIsDetailDrawerOpen(false);
           }}
           onCriterionToggle={handleCriterionToggle}
           onStatusChange={handleStatusChange}
           onTaskToggle={handleTaskToggle}
-          open={isDetailDrawerOpen}
-          workItem={selectedWorkItem}
-        />
-      ) : null}
+        open={isDetailDrawerOpen}
+        workItem={selectedWorkItem}
+      />
     </>
   );
 }
