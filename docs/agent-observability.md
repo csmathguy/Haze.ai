@@ -35,11 +35,21 @@ That shape is intentionally compatible with Semantic Kernel's filter model: befo
 - both hooks use the same audited command wrappers as manual runs, so hook behavior stays visible and reproducible
 - hook-level executions are recorded with `kind: "hook"` before nested command spans are emitted
 
+## Audit Storage
+
+- The shared audit database defaults to `C:\Users\<user>\.taxes\audit\sqlite\audit.db`
+- All worktrees write into that one SQLite file, and each run stores `repoPath` plus `worktreePath`
+- The current rollout is dual-write:
+  - file artifacts still land under `artifacts/audit/`
+  - the same events and summaries are mirrored into the shared database
+- The monitor stack lives under:
+  - `apps/audit/api`
+  - `apps/audit/web`
+
 ## Audit Artifacts
 
-- Audit data is written to `artifacts/audit/`
-- Runs are grouped by date under `artifacts/audit/YYYY-MM-DD/`
-- Each run gets its own folder with:
+- Runs are still grouped by date under `artifacts/audit/YYYY-MM-DD/`
+- Each run folder keeps:
   - `events.ndjson`
   - `summary.json`
   - `logs/*.log`
@@ -74,3 +84,4 @@ That shape is intentionally compatible with Semantic Kernel's filter model: befo
 - works for Codex-style workflows without requiring proprietary hook support
 - easy to attach to git hooks now and CI later
 - supports explicit skill/tool instrumentation today and Semantic Kernel filter adapters later
+- gives multiple local worktrees one live monitoring surface instead of fragmented folder-only logs

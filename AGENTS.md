@@ -16,9 +16,10 @@
 2. Work in red-green-refactor order for behavior changes whenever practical.
 3. For substantial implementation work, start an audited workflow with `npm run workflow:start implementation "<summary>"`.
 4. For multi-step agent work inside an active workflow, log explicit skill, tool, hook, or operation spans with `npm run execution:start -- --workflow <name> --kind <skill|tool|hook|operation|validation> --name <label>` and close them with `npm run execution:end -- --workflow <name> --execution-id <id> --status success|failed`.
-5. For Prisma schema changes, edit `prisma/schema.prisma`, create a checked-in migration with `npm run prisma:migrate:dev -- --name <change-name>`, and never hand-edit older migration folders unless explicitly instructed.
-6. Regenerate and validate Prisma after schema changes with `npm run prisma:check`.
-7. Before finishing, run the strongest available validation for the touched area:
+5. Use `npm run dev:audit:api` and `npm run dev:audit:web` when you need the live shared audit monitor while agents are running.
+6. For Prisma schema changes, edit `prisma/schema.prisma`, create a checked-in migration with `npm run prisma:migrate:dev -- --name <change-name>`, and never hand-edit older migration folders unless explicitly instructed.
+7. Regenerate and validate Prisma after schema changes with `npm run prisma:check`.
+8. Before finishing, run the strongest available validation for the touched area:
    - Fast iteration: `npm run quality:changed -- <files...>` or let the git `pre-commit` hook run `npm run quality:changed:staged`
    - Database changes: `npm run prisma:check` and `npm run prisma:migrate:deploy`
    - Full compile checks with `npm run typecheck`
@@ -26,11 +27,12 @@
    - Frontend styling changes: `npm run stylelint`
    - Full tests with `npm test` or architecture-only tests with `npm run test:arch`
    - Use `npm run quality:logged -- implementation` when you want a single audited full guardrail run
-8. Close audited work with `npm run workflow:end implementation success` or `failed`.
-9. If a command is not available yet, note the gap and update the nearest documentation or scaffold so the repo moves toward that standard.
+9. Close audited work with `npm run workflow:end implementation success` or `failed`.
+10. If a command is not available yet, note the gap and update the nearest documentation or scaffold so the repo moves toward that standard.
 
 ## Architecture Rules
 - Keep a strict separation between `apps/web`, `apps/api`, and `packages/shared`.
+- Keep a strict separation between web and api layers, including nested app domains such as `apps/audit/web` and `apps/audit/api`.
 - `packages/shared` must stay framework-light and hold reusable domain types, schemas, and pure helpers.
 - UI components should not parse raw tax documents directly. Extraction belongs behind backend application services.
 - External document conversion or OCR tools must sit behind adapters so they can be swapped without rewriting business logic.
@@ -42,6 +44,7 @@
 - Never commit raw tax documents, generated filings, or local extracted data.
 - Redact or avoid logging SSNs, EINs, bank numbers, addresses, or full document contents.
 - Default to offline-capable libraries and local storage paths outside the repository for private files.
+- Treat the shared audit database under the user profile as local sensitive operational data.
 
 ## Documentation
 - Use `docs/documentation-standards.md` when writing or restructuring long-lived docs or skill references.
