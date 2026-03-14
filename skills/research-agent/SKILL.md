@@ -24,7 +24,8 @@ This skill turns ad hoc web searching into a dated, source-ranked workflow that 
    - the key facts with dated citations
    - open questions or ambiguity
    - follow-up docs, code, or skills to update
-10. If the same friction appears twice, improve this skill instead of relying on memory.
+10. If the research surfaces future work, deferred implementation, or a later-phase product idea, create or refine a planning work item before closing the task.
+11. If the same friction appears twice, improve this skill instead of relying on memory.
 
 ## Key Rules
 
@@ -34,6 +35,7 @@ This skill turns ad hoc web searching into a dated, source-ranked workflow that 
 - Do not collapse source authority levels. A statute, regulation, or official bulletin carries different weight than a FAQ or blog post.
 - Keep the output scoped to the user's question. Research breadth is not a substitute for a clear answer.
 - Update `docs/research-sources.md` when the research changes repository guidance or adds a major source family.
+- Follow-up recommendations are not durable unless they also exist in planning as backlog items or updates to existing work items.
 
 ## When To Pull More Context
 
