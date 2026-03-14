@@ -73,6 +73,7 @@ The current curated catalog includes `figma` and `figma-implement-design`. Those
 - wrap repeatable command sequences in scripts instead of relying on the model to reproduce them from memory
 - prefer structured logs over free-form notes when you want auditability
 - use a dedicated research skill when guidance must be dated, source-ranked, or converted into repeatable repo standards
+- future ideas, deferred work, and follow-up recommendations should become planning work items instead of remaining only in chat, docs, or knowledge entries
 - keep merge authority with humans even when agents prepare the branch, commits, and pull request
 
 ## Current Worktree Gap
@@ -90,5 +91,6 @@ The repository workflow should stay explicit in this order:
 4. Start the audited implementation workflow inside that worktree.
 5. Update the planning item to `in-progress` with the current owner and workflow run ID.
 6. Keep tasks, criteria, and status current while work is active.
-7. Publish the branch and PR before calling implementation complete.
-8. End in a truthful state such as `done`, `blocked`, or back to `planning`.
+7. Persist newly discovered future work as separate work items before closing the current task.
+8. Publish the branch and PR before calling implementation complete.
+9. End in a truthful state such as `done`, `blocked`, or back to `planning`.
