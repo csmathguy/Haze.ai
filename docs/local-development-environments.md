@@ -21,6 +21,12 @@ This is an inference from the source set and the current codebase. Official npm 
 - `npm run dev:env -- --environment all --dry-run`
   - prints the launch plan without starting processes
 
+## Repo refresh helper
+
+`npm run repo:refresh` chains `git fetch origin main`, `git pull origin main`, and `npm install` (using the pinned `tools/runtime/run-npm.cjs` helper) before restarting the named environment(s). By default it launches `--environment all`, but you can pass `--environment`/`--env` multiple times or comma-separated to run a subset, override the branch/remote with `--branch`/`--remote`, or stop before the services start with `--skip-dev`.
+
+After the refresh finishes, the same `npm run dev:env` flow brings every API and web app back online and logs into `.tmp` artifacts; stop the session with `Ctrl+C` just as you would during a manual launch. Run `npm run repo:refresh -- --help` to see the full option set.
+
 The launcher starts from the repository's main checkout even when you invoke it from a worktree. That gives the team one stable target today while preserving a clean seam for future worktree selection.
 
 ## Named Environments
@@ -65,6 +71,7 @@ PM2 supports declaring multiple applications with per-app `cwd`, `script`, and w
 - The launcher writes service logs into ignored audit artifact paths.
 - The launcher records a structured audit run for each environment session.
 - If the main checkout does not have dependencies installed, the launcher fails fast and tells you to run `npm install` there.
+- Prisma-backed API watch scripts exclude generated Prisma client directories under `node_modules` so `npm install` or `npm run prisma:generate` does not tear down running local APIs during client regeneration.
 - Use `Ctrl+C` to stop the whole environment session.
 
 ## Future Seam
