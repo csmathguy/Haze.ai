@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from "react";
+import type { Dispatch, PointerEvent as ReactPointerEvent, ReactElement, ReactNode, RefObject, SetStateAction } from "react";
 import MergeTypeOutlinedIcon from "@mui/icons-material/MergeTypeOutlined";
 import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
 import { Alert, Box, Chip, Container, Paper, Stack, Typography, useMediaQuery } from "@mui/material";
@@ -140,8 +140,111 @@ function clampDrawerWidth(width: number): number {
   return Math.max(MIN_DRAWER_WIDTH, Math.min(maxWidth, width));
 }
 
+interface DrawerResizeRefs {
+  readonly animationFrameIdRef: RefObject<number | null>;
+  readonly latestWidthRef: RefObject<number>;
+  readonly pointerIdRef: RefObject<number | null>;
+  readonly resizeHandleRef: RefObject<HTMLButtonElement | null>;
+  readonly resizeStartWidthRef: RefObject<number>;
+  readonly resizeStartXRef: RefObject<number>;
+  readonly stopResizeRef: RefObject<(() => void) | null>;
+}
+
+function clearScheduledResizeFrame(animationFrameIdRef: RefObject<number | null>): void {
+  if (animationFrameIdRef.current === null) {
+    return;
+  }
+
+  window.cancelAnimationFrame(animationFrameIdRef.current);
+  animationFrameIdRef.current = null;
+}
+
+function flushResizeWidth(refs: DrawerResizeRefs, setDrawerWidth: Dispatch<SetStateAction<number>>): void {
+  clearScheduledResizeFrame(refs.animationFrameIdRef);
+  setDrawerWidth(refs.latestWidthRef.current);
+}
+
+function createResizeSession(
+  event: ReactPointerEvent<HTMLButtonElement>,
+  drawerWidth: number,
+  refs: DrawerResizeRefs,
+  setDrawerWidth: Dispatch<SetStateAction<number>>
+): () => void {
+  const resizeHandle = event.currentTarget;
+
+  refs.resizeHandleRef.current = resizeHandle;
+  refs.pointerIdRef.current = event.pointerId;
+  refs.resizeStartXRef.current = event.clientX;
+  refs.resizeStartWidthRef.current = drawerWidth;
+  refs.latestWidthRef.current = drawerWidth;
+
+  resizeHandle.setPointerCapture(event.pointerId);
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+
+  const scheduleResizeWidth = () => {
+    if (refs.animationFrameIdRef.current !== null) {
+      return;
+    }
+
+    refs.animationFrameIdRef.current = window.requestAnimationFrame(() => {
+      flushResizeWidth(refs, setDrawerWidth);
+    });
+  };
+  const handlePointerMove = (moveEvent: PointerEvent) => {
+    if (moveEvent.pointerId !== refs.pointerIdRef.current) {
+      return;
+    }
+
+    refs.latestWidthRef.current = clampDrawerWidth(refs.resizeStartWidthRef.current + (refs.resizeStartXRef.current - moveEvent.clientX));
+    scheduleResizeWidth();
+  };
+  const handlePointerEnd = (moveEvent: PointerEvent) => {
+    if (moveEvent.pointerId !== refs.pointerIdRef.current) {
+      return;
+    }
+
+    refs.stopResizeRef.current?.();
+  };
+  const handleWindowBlur = () => {
+    refs.stopResizeRef.current?.();
+  };
+
+  resizeHandle.addEventListener("pointermove", handlePointerMove);
+  resizeHandle.addEventListener("pointerup", handlePointerEnd);
+  resizeHandle.addEventListener("pointercancel", handlePointerEnd);
+  resizeHandle.addEventListener("lostpointercapture", handlePointerEnd);
+  window.addEventListener("blur", handleWindowBlur);
+
+  return () => {
+    resizeHandle.removeEventListener("pointermove", handlePointerMove);
+    resizeHandle.removeEventListener("pointerup", handlePointerEnd);
+    resizeHandle.removeEventListener("pointercancel", handlePointerEnd);
+    resizeHandle.removeEventListener("lostpointercapture", handlePointerEnd);
+    window.removeEventListener("blur", handleWindowBlur);
+
+    flushResizeWidth(refs, setDrawerWidth);
+
+    if (
+      refs.resizeHandleRef.current !== null &&
+      refs.pointerIdRef.current !== null &&
+      refs.resizeHandleRef.current.hasPointerCapture(refs.pointerIdRef.current)
+    ) {
+      refs.resizeHandleRef.current.releasePointerCapture(refs.pointerIdRef.current);
+    }
+
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    refs.pointerIdRef.current = null;
+    refs.resizeHandleRef.current = null;
+    refs.stopResizeRef.current = null;
+  };
+}
+
 function useResizableDrawer(isDesktop: boolean) {
   const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
+  const animationFrameIdRef = useRef<number | null>(null);
+  const latestWidthRef = useRef(DEFAULT_DRAWER_WIDTH);
   const pointerIdRef = useRef<number | null>(null);
   const resizeHandleRef = useRef<HTMLButtonElement | null>(null);
   const resizeStartXRef = useRef(0);
@@ -151,6 +254,19 @@ function useResizableDrawer(isDesktop: boolean) {
   const stopResize = useEffectEvent(() => {
     stopResizeRef.current?.();
   });
+  const resizeRefs: DrawerResizeRefs = {
+    animationFrameIdRef,
+    latestWidthRef,
+    pointerIdRef,
+    resizeHandleRef,
+    resizeStartWidthRef,
+    resizeStartXRef,
+    stopResizeRef
+  };
+
+  useEffect(() => {
+    latestWidthRef.current = drawerWidth;
+  }, [drawerWidth]);
 
   useEffect(() => {
     if (!isDesktop) {
@@ -170,55 +286,19 @@ function useResizableDrawer(isDesktop: boolean) {
     };
   }, [isDesktop, stopResize]);
 
+  useEffect(() => {
+    return () => {
+      clearScheduledResizeFrame(animationFrameIdRef);
+    };
+  }, []);
+
   function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (!isDesktop || event.button !== 0) {
       return;
     }
 
     event.preventDefault();
-    const resizeHandle = event.currentTarget;
-
-    resizeHandleRef.current = resizeHandle;
-    pointerIdRef.current = event.pointerId;
-    resizeStartXRef.current = event.clientX;
-    resizeStartWidthRef.current = drawerWidth;
-
-    resizeHandle.setPointerCapture(event.pointerId);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      setDrawerWidth(clampDrawerWidth(resizeStartWidthRef.current + (resizeStartXRef.current - moveEvent.clientX)));
-    };
-    const handlePointerUp = () => {
-      stopResizeRef.current?.();
-    };
-
-    stopResizeRef.current = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      window.removeEventListener("pointercancel", handlePointerUp);
-      window.removeEventListener("blur", handlePointerUp);
-
-      if (
-        resizeHandleRef.current !== null &&
-        pointerIdRef.current !== null &&
-        resizeHandleRef.current.hasPointerCapture(pointerIdRef.current)
-      ) {
-        resizeHandleRef.current.releasePointerCapture(pointerIdRef.current);
-      }
-
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      pointerIdRef.current = null;
-      resizeHandleRef.current = null;
-      stopResizeRef.current = null;
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("pointercancel", handlePointerUp);
-    window.addEventListener("blur", handlePointerUp);
+    stopResizeRef.current = createResizeSession(event, drawerWidth, resizeRefs, setDrawerWidth);
   }
 
   return {
