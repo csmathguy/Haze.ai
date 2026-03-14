@@ -12,14 +12,23 @@ import {
   createKnowledgeEntry,
   createKnowledgeSubject,
   getKnowledgeWorkspace,
-  importRepositoryKnowledge
+  importRepositoryKnowledge,
+  updateKnowledgeEntry
 } from "../../apps/knowledge/api/src/services/knowledge.js";
+import {
+  findKnowledgeEntries,
+  FindKnowledgeEntriesInputSchema,
+  ResearchReportUpsertInputSchema,
+  resolveResearchReportUpsert
+} from "./research-report.js";
 
 type CommandHandler = (args: string[]) => Promise<unknown>;
 
 const commandHandlers = new Map<string, CommandHandler>([
+  ["entry:find", handleEntryFind],
   ["entry:create", handleEntryCreate],
   ["repo-docs:sync", handleRepoDocsSync],
+  ["research-report:upsert", handleResearchReportUpsert],
   ["subject:create", handleSubjectCreate],
   ["workspace:get", handleWorkspaceGet]
 ]);
@@ -58,6 +67,40 @@ async function handleEntryCreate(args: string[]): Promise<{ entry: Awaited<Retur
   };
 }
 
+async function handleEntryFind(args: string[]): Promise<{ entries: ReturnType<typeof findKnowledgeEntries> }> {
+  const workspace = await getKnowledgeWorkspace();
+  const input = FindKnowledgeEntriesInputSchema.parse({
+    kind: readOptionalFlag(args, "--kind"),
+    limit: readOptionalIntFlag(args, "--limit"),
+    namespace: readOptionalFlag(args, "--namespace"),
+    search: readOptionalFlag(args, "--search")
+  });
+
+  return {
+    entries: findKnowledgeEntries(workspace.entries, input)
+  };
+}
+
+async function handleResearchReportUpsert(
+  args: string[]
+): Promise<{ action: "create" | "update"; entry: Awaited<ReturnType<typeof createKnowledgeEntry>> }> {
+  const workspace = await getKnowledgeWorkspace();
+  const input = await readJsonFileFlag(args, "--json-file", ResearchReportUpsertInputSchema);
+  const mutation = resolveResearchReportUpsert(workspace.entries, input, new Date().toISOString());
+
+  if (mutation.action === "create") {
+    return {
+      action: "create",
+      entry: await createKnowledgeEntry(mutation.input)
+    };
+  }
+
+  return {
+    action: "update",
+    entry: await updateKnowledgeEntry(mutation.entryId, mutation.input)
+  };
+}
+
 async function handleRepoDocsSync(): Promise<{ sync: Awaited<ReturnType<typeof importRepositoryKnowledge>> }> {
   return {
     sync: await importRepositoryKnowledge()
@@ -65,10 +108,20 @@ async function handleRepoDocsSync(): Promise<{ sync: Awaited<ReturnType<typeof i
 }
 
 function readRequiredFlag(args: string[], flagName: string): string {
+  const value = readOptionalFlag(args, flagName);
+
+  if (value === undefined) {
+    throw new Error(`Pass ${flagName}.`);
+  }
+
+  return value;
+}
+
+function readOptionalFlag(args: string[], flagName: string): string | undefined {
   const index = args.indexOf(flagName);
 
   if (index === -1) {
-    throw new Error(`Pass ${flagName}.`);
+    return undefined;
   }
 
   const value = args[index + 1];
@@ -78,6 +131,16 @@ function readRequiredFlag(args: string[], flagName: string): string {
   }
 
   return value;
+}
+
+function readOptionalIntFlag(args: string[], flagName: string): number | undefined {
+  const value = readOptionalFlag(args, flagName);
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return Number(value);
 }
 
 async function readJsonFileFlag<TSchemaOutput>(

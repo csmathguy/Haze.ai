@@ -61,6 +61,41 @@ Implication for this repo:
 4. Expose both a web UI and a CLI or skill path so agents are not forced to scrape the UI.
 5. Mirror repository docs into knowledge entries so research can move out of `docs/` over time without losing referenceability.
 
+## Research Consolidation Workflow
+
+Reviewed on March 14, 2026.
+
+Durable research should improve over time instead of accumulating as disconnected notes.
+
+Recommended workflow:
+
+1. Search the local knowledge base for an existing `research-report` entry before using web search.
+2. Read prior findings and identify what is still valid, what is stale, and what was previously unresolved.
+3. Gather new dated sources and keep source authority explicit.
+4. Consolidate the old and new material into one improved report when the topic is the same:
+   - preserve valid prior findings
+   - replace weaker claims with stronger or newer evidence
+   - keep explicit open questions
+   - update review timestamps and provenance
+5. Create a separate report only when the scope meaningfully changes, such as a different jurisdiction, tax year, product major version, or audience.
+
+This is an inference from the memory-model research above: selective retrieval, provenance, and scoped memory are more durable than unstructured append-only notes.
+
+## Future Direction
+
+The current repository model supports subjects and entries, but not a first-class knowledge graph or teaching loop yet.
+
+Near-term direction:
+
+- use namespaces, subject links, tags, and repeated research-report updates as the consolidation layer
+- add better retrieval, relationship modeling, and visualization after the repeated workflows prove out
+
+Future backlog direction:
+
+- explicit graph relationships across people, projects, workflows, libraries, and concepts
+- visualization surfaces for browsing related research and understanding how topics connect
+- human-learning features such as guided review, spaced repetition, or lightweight gamification once the knowledge model is mature enough to support them safely
+
 ## Sources
 
 - LangGraph docs, "Memory", reviewed March 13, 2026: https://langchain-ai.github.io/langgraph/concepts/memory/
