@@ -1,5 +1,5 @@
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from "react";
+import { startTransition, useEffect, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
 import MergeTypeOutlinedIcon from "@mui/icons-material/MergeTypeOutlined";
 import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
 import { Alert, Box, Chip, Container, Paper, Stack, Typography, useMediaQuery } from "@mui/material";
@@ -10,10 +10,7 @@ import { fetchCodeReviewPullRequest, fetchCodeReviewWorkspace } from "./api.js";
 import { PullRequestDetailDrawer } from "./components/PullRequestDetailDrawer.js";
 import { PullRequestList } from "./components/PullRequestList.js";
 import { countPullRequestsByState } from "./index.js";
-
-const DEFAULT_DRAWER_WIDTH = 860;
-const MIN_DRAWER_WIDTH = 640;
-const VIEWPORT_MARGIN = 220;
+import { useResizableDrawer } from "./use-resizable-drawer.js";
 
 export function App() {
   const controller = useCodeReviewController();
@@ -128,102 +125,6 @@ function useCodeReviewController() {
     setSelectedLaneId,
     setSelectedPullRequestNumber,
     workspace
-  };
-}
-
-function clampDrawerWidth(width: number): number {
-  if (typeof window === "undefined") {
-    return width;
-  }
-
-  const maxWidth = Math.max(MIN_DRAWER_WIDTH, window.innerWidth - VIEWPORT_MARGIN);
-  return Math.max(MIN_DRAWER_WIDTH, Math.min(maxWidth, width));
-}
-
-function useResizableDrawer(isDesktop: boolean) {
-  const [drawerWidth, setDrawerWidth] = useState(DEFAULT_DRAWER_WIDTH);
-  const pointerIdRef = useRef<number | null>(null);
-  const resizeHandleRef = useRef<HTMLButtonElement | null>(null);
-  const resizeStartXRef = useRef(0);
-  const resizeStartWidthRef = useRef(DEFAULT_DRAWER_WIDTH);
-  const stopResizeRef = useRef<(() => void) | null>(null);
-
-  const stopResize = useEffectEvent(() => {
-    stopResizeRef.current?.();
-  });
-
-  useEffect(() => {
-    if (!isDesktop) {
-      return;
-    }
-
-    const handleWindowResize = () => {
-      setDrawerWidth((currentWidth) => clampDrawerWidth(currentWidth));
-    };
-
-    handleWindowResize();
-    window.addEventListener("resize", handleWindowResize);
-
-    return () => {
-      window.removeEventListener("resize", handleWindowResize);
-      stopResize();
-    };
-  }, [isDesktop, stopResize]);
-
-  function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!isDesktop || event.button !== 0) {
-      return;
-    }
-
-    event.preventDefault();
-    const resizeHandle = event.currentTarget;
-
-    resizeHandleRef.current = resizeHandle;
-    pointerIdRef.current = event.pointerId;
-    resizeStartXRef.current = event.clientX;
-    resizeStartWidthRef.current = drawerWidth;
-
-    resizeHandle.setPointerCapture(event.pointerId);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      setDrawerWidth(clampDrawerWidth(resizeStartWidthRef.current + (resizeStartXRef.current - moveEvent.clientX)));
-    };
-    const handlePointerUp = () => {
-      stopResizeRef.current?.();
-    };
-
-    stopResizeRef.current = () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      window.removeEventListener("pointercancel", handlePointerUp);
-      window.removeEventListener("blur", handlePointerUp);
-
-      if (
-        resizeHandleRef.current !== null &&
-        pointerIdRef.current !== null &&
-        resizeHandleRef.current.hasPointerCapture(pointerIdRef.current)
-      ) {
-        resizeHandleRef.current.releasePointerCapture(pointerIdRef.current);
-      }
-
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      pointerIdRef.current = null;
-      resizeHandleRef.current = null;
-      stopResizeRef.current = null;
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("pointercancel", handlePointerUp);
-    window.addEventListener("blur", handlePointerUp);
-  }
-
-  return {
-    drawerWidth,
-    startResize
   };
 }
 
