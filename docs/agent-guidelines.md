@@ -71,6 +71,7 @@ The current curated catalog includes `figma` and `figma-implement-design`. Those
 - wrap repeatable command sequences in scripts instead of relying on the model to reproduce them from memory
 - prefer structured logs over free-form notes when you want auditability
 - use a dedicated research skill when guidance must be dated, source-ranked, or converted into repeatable repo standards
+- durable research should be looked up in and written back to the knowledge base, not left only in docs or chat
 - keep merge authority with humans even when agents prepare the branch, commits, and pull request
 
 ## Execution Lifecycle
