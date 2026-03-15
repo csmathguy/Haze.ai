@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { rm } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 
 const PRISMA_CLI_ENTRYPOINT = path.resolve("node_modules", "prisma", "build", "index.js");
@@ -13,10 +13,12 @@ const PRISMA_CLI_ENTRYPOINT = path.resolve("node_modules", "prisma", "build", "i
 // output path is inside the source tree (packages/db/src/generated), not node_modules.
 const generateCwd = process.cwd();
 const GENERATED_CLIENT_DIRECTORY = path.resolve(generateCwd, "packages", "db", "src", "generated", "prisma");
+const GENERATED_CLIENT_SHIM_PATH = path.resolve(GENERATED_CLIENT_DIRECTORY, "client.js");
 
 async function main(): Promise<void> {
   await rm(GENERATED_CLIENT_DIRECTORY, { force: true, recursive: true });
   await runPrismaGenerate();
+  await writeClientShim();
 }
 
 async function runPrismaGenerate(): Promise<void> {
@@ -37,6 +39,12 @@ async function runPrismaGenerate(): Promise<void> {
       reject(new Error(`Prisma generate exited with code ${code?.toString() ?? "unknown"}.`));
     });
   });
+}
+
+async function writeClientShim(): Promise<void> {
+  // Prisma 7 with `provider = "prisma-client"` emits TypeScript source files.
+  // Runtime tools import `generated/prisma/client.js`, so emit a tiny ESM shim.
+  await writeFile(GENERATED_CLIENT_SHIM_PATH, 'export * from "./client.ts";\n', "utf8");
 }
 
 void main().catch((error: unknown) => {

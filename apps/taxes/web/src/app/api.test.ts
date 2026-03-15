@@ -35,6 +35,22 @@ describe("app api", () => {
             requiredForms: ["1040"]
           },
           extractions: [],
+          filingChecklist: {
+            differsByJurisdiction: false,
+            federal: {
+              items: [],
+              jurisdiction: "federal",
+              readiness: "ready"
+            },
+            filingStatus: "single",
+            state: {
+              items: [],
+              jurisdiction: "state",
+              readiness: "ready"
+            },
+            stateResidence: "NY",
+            taxYear: 2025
+          },
           generatedAt: "2026-03-11T18:00:00.000Z",
           household: {
             filingStatus: "single",

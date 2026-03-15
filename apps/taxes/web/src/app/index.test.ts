@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceSnapshot } from "@taxes/shared";
 
-import { buildReviewBanner, buildScenarioChartData, formatScenarioTax, summarizeRequiredForms } from "./index.js";
+import { buildReviewBanner, buildScenarioChartData, formatScenarioTax, summarizeFilingReadiness, summarizeRequiredForms } from "./index.js";
 
 function createWorkspaceSnapshot(overrides: Partial<WorkspaceSnapshot>): WorkspaceSnapshot {
   return {
@@ -22,6 +22,22 @@ function createWorkspaceSnapshot(overrides: Partial<WorkspaceSnapshot>): Workspa
       requiredForms: ["1040"]
     },
     extractions: [],
+    filingChecklist: {
+      differsByJurisdiction: false,
+      federal: {
+        items: [],
+        jurisdiction: "federal",
+        readiness: "ready"
+      },
+      filingStatus: "single",
+      state: {
+        items: [],
+        jurisdiction: "state",
+        readiness: "ready"
+      },
+      stateResidence: "NY",
+      taxYear: 2025
+    },
     generatedAt: "2026-03-10T23:00:00.000Z",
     household: {
       filingStatus: "single",
@@ -152,6 +168,37 @@ describe("summarizeRequiredForms", () => {
       })
       )
     ).toBe("1040, schedule-b");
+  });
+});
+
+describe("summarizeFilingReadiness", () => {
+  it("shows ready only when federal and state readiness are both ready", () => {
+    expect(summarizeFilingReadiness(createWorkspaceSnapshot({}))).toBe("Federal + state ready");
+  });
+
+  it("shows a mismatch summary when federal and state readiness differ", () => {
+    expect(
+      summarizeFilingReadiness(
+        createWorkspaceSnapshot({
+          filingChecklist: {
+            differsByJurisdiction: true,
+            federal: {
+              items: [],
+              jurisdiction: "federal",
+              readiness: "ready"
+            },
+            filingStatus: "single",
+            state: {
+              items: [],
+              jurisdiction: "state",
+              readiness: "needs-documents"
+            },
+            stateResidence: "NY",
+            taxYear: 2025
+          }
+        })
+      )
+    ).toBe("Federal/state differ");
   });
 });
 

@@ -28,6 +28,11 @@ describe("getWorkspaceSnapshot", () => {
     expect(snapshot.questionnaire.length).toBeGreaterThan(0);
     expect(snapshot.reviewQueue).toEqual([]);
     expect(snapshot.draft.requiredForms).toEqual(["1040"]);
+    expect(snapshot.filingChecklist.taxYear).toBe(snapshot.household.taxYear);
+    expect(snapshot.filingChecklist.federal.readiness).toBe("needs-documents");
+    expect(snapshot.filingChecklist.state.readiness).toBe("needs-documents");
+    expect(snapshot.filingChecklist.federal.items.find((item) => item.id === "income-records")?.status).toBe("missing");
+    expect(snapshot.filingChecklist.federal.items.find((item) => item.id === "prior-year-reference")?.status).toBe("missing");
   });
 
   it("elevates digital-asset forms and review tasks when crypto exports are present", async () => {
@@ -60,6 +65,25 @@ describe("getWorkspaceSnapshot", () => {
       "highest-basis"
     );
     expect(snapshot.reviewQueue.length).toBeGreaterThan(0);
+    expect(snapshot.filingChecklist.federal.items.find((item) => item.id === "capital-activity-records")?.blocker).toBe(true);
+    expect(snapshot.filingChecklist.federal.items.find((item) => item.id === "capital-activity-records")?.status).toBe(
+      "incomplete"
+    );
+    expect(snapshot.filingChecklist.federal.readiness).toBe("needs-documents");
+  });
+
+  it("flags when federal and state readiness differ", async () => {
+    const workspace = await createTestWorkspaceContext("taxes-workspace-readiness-diff");
+    workspaces.push(workspace);
+
+    await saveUploadedDocument(createMultipartFile("2025-W2-employer.pdf"), 2025, workspace);
+    await saveUploadedDocument(createMultipartFile("2024-1040-federal-reference.pdf"), 2025, workspace);
+
+    const snapshot = await getWorkspaceSnapshot(workspace);
+
+    expect(snapshot.filingChecklist.federal.readiness).toBe("needs-review");
+    expect(snapshot.filingChecklist.state.readiness).toBe("needs-documents");
+    expect(snapshot.filingChecklist.differsByJurisdiction).toBe(true);
   });
 });
 

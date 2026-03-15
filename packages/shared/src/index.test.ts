@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDocumentMissingFacts,
   buildQuestionnairePrompts,
+  buildFilingReadinessChecklist,
   createEmptyTaxReturnDraft,
   createReviewTasksFromDataGaps,
   createReviewTasksFromDocuments,
@@ -287,5 +288,66 @@ describe("deriveRequiredForms", () => {
         }
       ])
     ).toEqual(["1040", "schedule-d", "form-8949"]);
+  });
+});
+
+describe("buildFilingReadinessChecklist", () => {
+  it("marks blocker checklist items as missing when no supporting documents are present", () => {
+    const checklist = buildFilingReadinessChecklist({
+      documents: [],
+      household: {
+        filingStatus: "single",
+        hasDigitalAssets: false,
+        primaryTaxpayer: "Local owner",
+        stateResidence: "NY",
+        taxYear: 2025
+      }
+    });
+
+    expect(checklist.taxYear).toBe(2025);
+    expect(checklist.federal.readiness).toBe("needs-documents");
+    expect(checklist.state.readiness).toBe("needs-documents");
+    expect(checklist.federal.items.find((item) => item.id === "income-records")?.status).toBe("missing");
+    expect(checklist.federal.items.find((item) => item.id === "prior-year-reference")?.status).toBe("missing");
+  });
+
+  it("flags readiness differences when federal blockers are complete but state blockers are not", () => {
+    const checklist = buildFilingReadinessChecklist({
+      documents: [
+        {
+          fileName: "2025-W2-employer.pdf",
+          fileSizeBytes: 1024,
+          id: "doc-w2",
+          importedAt: "2026-03-10T23:00:00.000Z",
+          kind: "w-2",
+          mimeType: "application/pdf",
+          missingFacts: [],
+          status: "mapped",
+          taxYear: 2025
+        },
+        {
+          fileName: "2024-federal-return.pdf",
+          fileSizeBytes: 2048,
+          id: "doc-prior-federal",
+          importedAt: "2026-03-10T23:00:00.000Z",
+          kind: "prior-year-return",
+          mimeType: "application/pdf",
+          missingFacts: [],
+          status: "mapped",
+          taxYear: 2025
+        }
+      ],
+      household: {
+        filingStatus: "single",
+        hasDigitalAssets: false,
+        primaryTaxpayer: "Local owner",
+        stateResidence: "NY",
+        taxYear: 2025
+      }
+    });
+
+    expect(checklist.federal.readiness).toBe("ready");
+    expect(checklist.state.readiness).toBe("needs-documents");
+    expect(checklist.differsByJurisdiction).toBe(true);
   });
 });
