@@ -478,6 +478,18 @@ model HeartbeatEvent {
   @@index([workItemId, createdAt])
 }
 
+model TranscriptArtifact {
+  id         String   @id @default(cuid())
+  runId      String   @unique
+  workItemId String?
+  filePath   String
+  capturedAt DateTime @default(now())
+  lineCount  Int?
+
+  @@index([workItemId])
+  @@index([capturedAt])
+}
+
 model AuditEventRecord {
   id                String                @id
   runId             String
