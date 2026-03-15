@@ -1,5 +1,53 @@
 # Agent Guidelines
 
+## Permission Policy
+
+Claude Code permission settings live in `.claude/settings.json` (git-ignored, copied from `.claude/settings.json.example`). The policy has two goals: let agents run the full implementation workflow without manual approval prompts, and block the small set of operations that are irreversible or dangerous.
+
+### Activating the settings
+
+```bash
+cp .claude/settings.json.example .claude/settings.json
+```
+
+Re-copy whenever `settings.json.example` is updated in a PR.
+
+### What is pre-approved (allow list)
+
+All safe commands agents need for the standard `worktree → implement → commit → push → PR → workflow:end` cycle:
+
+| Category | Examples |
+|----------|---------|
+| Git read | `git status`, `git log`, `git diff`, `git show`, `git branch`, `git stash list` |
+| Git write | `git add`, `git commit`, `git push`, `git fetch`, `git merge`, `git worktree` |
+| Git `-C <path>` form | All of the above prefixed with `git -C <worktree-path>` for cross-directory operations |
+| npm / Node | `npm run *`, `node tools/runtime/run-npm.cjs run *`, `node *`, `npx *` |
+| GitHub CLI | `gh pr *`, `gh run *`, `gh issue *`, `gh api *` |
+| Shell utilities | `ls`, `cat`, `head`, `tail`, `grep`, `find`, `wc`, `pwd`, `which`, `echo`, `sleep` |
+| Windows compat | `cmd /c mklink` (junction creation), `cmd /c dir`, `powershell -Command` |
+| Web research | `WebSearch`, `WebFetch` for approved domains (docs.anthropic.com, prisma.io, vitest.dev, etc.) |
+
+### What is blocked (deny list)
+
+These are blocked regardless of any allow rule:
+
+| Command | Why blocked |
+|---------|-------------|
+| `rm -rf *` | Recursive force-delete — can silently wipe the repo or system directories |
+| `git push --force*` | Overwrites remote history, loses teammates' commits |
+| `git reset --hard*` | Destroys all uncommitted local changes immediately |
+| `git clean -f*` | Permanently deletes untracked files without confirmation |
+| `git branch -D *` | Force-deletes branches; use PR merge flow instead |
+| `format *:*` | Windows disk format command |
+
+### Adding new approved commands
+
+1. Edit `.claude/settings.json.example` in a PR.
+2. After the PR is merged, re-copy: `cp .claude/settings.json.example .claude/settings.json`.
+3. Do NOT add commands directly to `settings.local.json` unless they are user-specific (e.g. personal WebFetch domains). The `.local.json` file is not committed and will diverge across machines.
+
+---
+
 ## Repo-Level Pattern
 
 Use `AGENTS.md` for always-on rules that every coding agent should follow in this repository:
