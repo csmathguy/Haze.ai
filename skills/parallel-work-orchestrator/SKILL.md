@@ -15,12 +15,13 @@ This skill turns a broad task into small parallel slices that fit the repository
 2. Read `docs/architecture.md` and the closest stack guide for the affected area.
 3. Identify contract-first seams such as `packages/shared`, `prisma/schema.prisma`, and root config.
 4. Split the work into slices with one primary boundary each.
-5. Classify each slice as **independent** or **dependent**:
+5. Create one worktree per slice with `npm run agent:worktree:create -- ...`. Worktree creation is **idempotent**: re-running the same command with the same task ID skips creation when the worktree already exists, so it is safe to use in retry loops. Pass `--force` to destroy and re-create (e.g. when the branch is in a bad state).
+6. Classify each slice as **independent** or **dependent**:
    - **Independent**: no shared file overlap, no blocking dependency on another slice's output
    - **Dependent**: must wait for a contract-first slice to merge first
-6. For independent slices, create all worktrees first, then dispatch all implementers in **one message** using parallel Agent tool calls (one per slice). This is the parallel path.
-7. For dependent slices, create worktrees after their upstream slice is merged and dispatch sequentially.
-8. Collect results from all parallel implementers before reporting completion.
+7. For independent slices, create all worktrees first, then dispatch all implementers in **one message** using parallel Agent tool calls (one per slice). This is the parallel path.
+8. For dependent slices, create worktrees after their upstream slice is merged and dispatch sequentially.
+9. Collect results from all parallel implementers before reporting completion.
 
 ## Parallel Dispatch Pattern
 

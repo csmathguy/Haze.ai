@@ -7,6 +7,7 @@ export interface ParallelTaskArgs {
   baseRef: string;
   dependsOn: string[];
   dryRun: boolean;
+  force: boolean;
   mergeMain: boolean;
   owner?: string;
   scopes: string[];
@@ -22,6 +23,7 @@ export interface ParallelTaskPlan {
   branchName: string;
   dependsOn: string[];
   dryRun: boolean;
+  force: boolean;
   localBriefPath: string;
   mergeMain: boolean;
   owner?: string;
@@ -44,6 +46,7 @@ export function parseParallelTaskArgs(rawArgs: string[]): ParallelTaskArgs {
     baseRef: "HEAD",
     dependsOn: [],
     dryRun: false,
+    force: false,
     mergeMain: false,
     scopes: [],
     validations: [],
@@ -106,6 +109,11 @@ function consumeArgument(
     return 0;
   }
 
+  if (current === "--force") {
+    parsed.force = true;
+    return 0;
+  }
+
   if (current === "--merge-main") {
     parsed.mergeMain = true;
     return 0;
@@ -130,6 +138,7 @@ function finalizeParsedArgs(parsed: Partial<ParallelTaskArgs>): ParallelTaskArgs
     baseRef: parsed.baseRef ?? "HEAD",
     dependsOn: dedupe(parsed.dependsOn ?? []),
     dryRun: parsed.dryRun ?? false,
+    force: parsed.force ?? false,
     mergeMain: parsed.mergeMain ?? false,
     ...(parsed.owner === undefined ? {} : { owner: parsed.owner }),
     scopes: dedupe(scopes),
@@ -170,6 +179,7 @@ export function createParallelTaskPlan(args: ParallelTaskArgs, repoRoot: string)
     branchName: `feature/${taskId}`,
     dependsOn: dedupe(args.dependsOn.map(normalizeTaskId)),
     dryRun: args.dryRun,
+    force: args.force,
     localBriefPath: normalizeRelativePath(path.join(worktreePath, ".codex-local", "parallel-task.md")),
     mergeMain: args.mergeMain,
     ...(args.owner === undefined ? {} : { owner: args.owner }),
