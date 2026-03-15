@@ -5,6 +5,8 @@ description: Use this skill when asked to write a retrospective, postmortem, wor
 
 # Workflow Retrospective
 
+<!-- Recommended model tier: T2 (Sonnet) — analysis and synthesis of audit data to identify patterns -->
+
 ## Overview
 
 Use this skill to turn a completed workflow run into an evidence-backed retrospective artifact. Ground observations in `artifacts/audit/`, keep the tone blameless, and finish with concrete follow-up actions.

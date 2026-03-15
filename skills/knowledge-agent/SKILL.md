@@ -5,6 +5,8 @@ description: Use this skill when an agent needs to read, write, or synchronize t
 
 # Knowledge Agent
 
+<!-- Recommended model tier: T1 (Haiku) — read/write knowledge store, low reasoning needed -->
+
 ## Overview
 
 This skill gives agents a repeatable local path into the knowledge system without scraping the web UI or editing SQLite manually.

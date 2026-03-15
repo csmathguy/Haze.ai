@@ -5,6 +5,8 @@ description: Use this skill when a feature or refactor should be decomposed into
 
 # Parallel Work Orchestrator
 
+<!-- Recommended model tier: T3 (Opus) — must decompose and delegate complex work across multiple agents -->
+
 ## Overview
 
 This skill turns a broad task into small parallel slices that fit the repository's boundaries and minimize merge conflicts. When slices are independent, the orchestrator dispatches them simultaneously using the Agent tool in a single message so they run in parallel rather than sequentially.

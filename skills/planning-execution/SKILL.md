@@ -5,6 +5,8 @@ description: "Use this skill when an agent is executing from the backlog: pull t
 
 # Planning Execution
 
+<!-- Recommended model tier: T2 (Sonnet) — reasoning about scope changes and status transitions during execution -->
+
 ## Overview
 
 Use this skill while implementing work that is already in the planning system. It keeps execution state, newly discovered scope, and validation progress synchronized with the shared planning database.

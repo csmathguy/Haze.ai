@@ -5,6 +5,8 @@ description: "Use this skill when a request needs a real planning pass before im
 
 # Planning Session
 
+<!-- Recommended model tier: T2 (Sonnet) — structured reasoning about work decomposition and dependencies -->
+
 ## Overview
 
 Use this skill to convert a request into project-scoped work items that agents can execute without relying on chat history. It is the entry skill for backlog intake, decomposition, and "future work" capture.

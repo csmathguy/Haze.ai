@@ -5,6 +5,8 @@ description: Use this skill when researching, choosing, or producing diagrams an
 
 # Visualization Workflow
 
+<!-- Recommended model tier: T2 (Sonnet) — moderate reasoning for diagram type selection and layout -->
+
 ## Overview
 
 Use this skill to choose the lightest visualization that answers the question and preserves local-only privacy. Prefer text-first, versionable artifacts for docs, PRs, and audit trails. Escalate to interactive runtime views only when users need drill-down, filtering, or direct manipulation.

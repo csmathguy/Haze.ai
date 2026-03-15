@@ -69,7 +69,12 @@ async function main(): Promise<void> {
     throw new Error(`No active execution found for "${args.executionId}" in workflow "${args.workflow}".`);
   }
 
-  const endMetadata = buildEndMetadata(args.message, args.metadata);
+  const endMetadata = buildEndMetadata(args.message, args.metadata, {
+    ...(args.estimatedCostUsd === undefined ? {} : { estimatedCostUsd: args.estimatedCostUsd }),
+    ...(args.inputTokens === undefined ? {} : { inputTokens: args.inputTokens }),
+    ...(args.modelId === undefined ? {} : { modelId: args.modelId }),
+    ...(args.outputTokens === undefined ? {} : { outputTokens: args.outputTokens })
+  });
 
   await endExecution(context, activeExecution as StartedExecution, {
     ...(args.exitCode === undefined ? {} : { exitCode: args.exitCode }),
@@ -89,12 +94,39 @@ interface StartArgs {
 }
 
 interface EndArgs {
+  estimatedCostUsd?: number;
   executionId: string;
   exitCode?: number;
+  inputTokens?: number;
   message?: string;
   metadata?: AuditMetadata;
+  modelId?: string;
+  outputTokens?: number;
   status: WorkflowStatus;
   workflow: string;
+}
+
+// Approximate pricing per million tokens (input / output) as of 2026-03.
+// Source: https://www.anthropic.com/pricing and https://openai.com/api/pricing
+// These are estimates — use for trend analysis, not billing.
+const MODEL_PRICING_USD_PER_MILLION: Record<string, { input: number; output: number }> = {
+  "claude-haiku-4-5-20251001": { input: 0.8, output: 4 },
+  "claude-haiku-4-5": { input: 0.8, output: 4 },
+  "claude-sonnet-4-6": { input: 3, output: 15 },
+  "claude-opus-4-6": { input: 15, output: 75 },
+  "codex-mini-latest": { input: 1.5, output: 6 },
+  "gpt-4o": { input: 2.5, output: 10 },
+  "gpt-4o-mini": { input: 0.15, output: 0.6 }
+};
+
+function estimateCostUsd(modelId: string, inputTokens: number, outputTokens: number): number | undefined {
+  const pricing = MODEL_PRICING_USD_PER_MILLION[modelId];
+
+  if (pricing === undefined) {
+    return undefined;
+  }
+
+  return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
 }
 
 async function resolveRunContext(workflow: string) {
@@ -144,6 +176,24 @@ function parseStartArgs(rawArgs: string[]): StartArgs {
   };
 }
 
+function parseTokenFields(parsed: Record<string, string[]>): TokenFields {
+  const fields: TokenFields = {};
+
+  if (parsed["--input-tokens"] !== undefined) fields.inputTokens = readNumber(parsed, "--input-tokens");
+  if (parsed["--output-tokens"] !== undefined) fields.outputTokens = readNumber(parsed, "--output-tokens");
+  if (parsed["--model-id"] !== undefined) fields.modelId = readRequiredString(parsed, "--model-id");
+
+  if (parsed["--estimated-cost-usd"] !== undefined) {
+    fields.estimatedCostUsd = readNumber(parsed, "--estimated-cost-usd");
+  } else if (fields.inputTokens !== undefined && fields.outputTokens !== undefined && fields.modelId !== undefined) {
+    const computed = estimateCostUsd(fields.modelId, fields.inputTokens, fields.outputTokens);
+
+    if (computed !== undefined) fields.estimatedCostUsd = computed;
+  }
+
+  return fields;
+}
+
 function parseEndArgs(rawArgs: string[]): EndArgs {
   const parsed = parseFlagPairs(rawArgs);
   const workflow = readRequiredString(parsed, "--workflow");
@@ -153,6 +203,7 @@ function parseEndArgs(rawArgs: string[]): EndArgs {
     executionId,
     status: parsed["--status"] === undefined ? "success" : readWorkflowStatus(parsed, "--status"),
     workflow,
+    ...parseTokenFields(parsed),
     ...(parsed["--exit-code"] === undefined ? {} : { exitCode: readNumber(parsed, "--exit-code") }),
     ...(parsed["--message"] === undefined ? {} : { message: readRequiredString(parsed, "--message") }),
     ...(parsed["--metadata"] === undefined ? {} : { metadata: parseMetadataEntries(parsed["--metadata"]) })
@@ -270,14 +321,28 @@ function parseMetadataValue(value: string): AuditMetadataValue {
   return parsed;
 }
 
-function buildEndMetadata(message: string | undefined, metadata: AuditMetadata | undefined): AuditMetadata | undefined {
-  if (message === undefined && metadata === undefined) {
+interface TokenFields {
+  estimatedCostUsd?: number;
+  inputTokens?: number;
+  modelId?: string;
+  outputTokens?: number;
+}
+
+function buildEndMetadata(
+  message: string | undefined,
+  metadata: AuditMetadata | undefined,
+  tokens: TokenFields
+): AuditMetadata | undefined {
+  const tokenEntries = Object.entries(tokens).filter(([, v]) => v !== undefined);
+
+  if (message === undefined && metadata === undefined && tokenEntries.length === 0) {
     return undefined;
   }
 
   return {
     ...(metadata ?? {}),
-    ...(message === undefined ? {} : { message })
+    ...(message === undefined ? {} : { message }),
+    ...Object.fromEntries(tokenEntries)
   };
 }
 

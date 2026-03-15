@@ -5,6 +5,8 @@ description: Use this skill when designing or refining the frontend for this rep
 
 # Ui Design Workflow
 
+<!-- Recommended model tier: T2 (Sonnet) — design reasoning needed for layout, accessibility, and theming tradeoffs -->
+
 ## Overview
 
 This skill keeps frontend work aligned with the repo's tax-focused UX priorities: reviewability, clarity, accessibility, and consistent Material UI usage. Use it for new screens, layout refactors, charting decisions, and component-system work.
