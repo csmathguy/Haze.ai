@@ -14,9 +14,15 @@ This skill keeps an implementation agent inside its assigned slice so parallel w
 1. Read the nearest `AGENTS.md`.
 2. Read `.codex-local/parallel-task.md` if it exists in the worktree.
 3. Read the closest docs for the owned boundary.
-4. Stay inside the allowed scope unless the orchestrator expands the slice.
-5. Run the listed validation commands before handoff.
-6. Report interface changes and residual conflict risks back to the orchestrator.
+4. Log a heartbeat at each major step so the orchestrator can tail progress live:
+   ```bash
+   npm run agent:heartbeat -- --message '<step description>'
+   ```
+   Call this after: worktree setup, workflow start, each major implementation phase, and before handoff.
+5. Stay inside the allowed scope unless the orchestrator expands the slice.
+6. Run the listed validation commands before handoff.
+7. Log a final heartbeat before PR creation: `npm run agent:heartbeat -- --message 'validation passed, opening PR'`
+8. Report interface changes and residual conflict risks back to the orchestrator.
 
 ## Key Rules
 
