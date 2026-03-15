@@ -12,6 +12,7 @@ export const DocumentKindSchema = z.enum([
   "charitable-contribution",
   "crypto-wallet-export",
   "other-income",
+  "prior-year-return",
   "property-tax-statement",
   "retirement-distribution",
   "schedule-k-1",
@@ -45,6 +46,7 @@ const DOCUMENT_PATTERNS: readonly (readonly [DocumentKind, RegExp])[] = [
   ["schedule-k-1", /\bk[\s-]?1\b/iu],
   ["brokerage-statement", /\bbroker(age)?\b|\bstatement\b/iu],
   ["crypto-wallet-export", /\bcrypto\b|\bbitcoin\b|\beth\b|\bwallet\b|\bcoinbase\b/iu],
+  ["prior-year-return", /\bprior[\s-]?year\b|\b(?:20\d{2})[\s-]?1040\b/iu],
   ["charitable-contribution", /\bcharit(y|able)\b|\bdonation\b/iu],
   ["property-tax-statement", /\bproperty\b.*\btax\b|\breal[\s-]?estate\b/iu],
   ["retirement-distribution", /\b1099[\s-]?r\b|\bretirement\b/iu]
@@ -79,6 +81,8 @@ export function buildDocumentMissingFacts(kind: DocumentKind): string[] {
       return ["wallet transfer matching", "fair market value at disposal"];
     case "property-tax-statement":
       return ["deductible tax portion"];
+    case "prior-year-return":
+      return ["carryover verification", "prior-year baseline reconciliation"];
     case "retirement-distribution":
       return ["distribution code interpretation", "rollover status"];
     case "schedule-k-1":

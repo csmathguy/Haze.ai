@@ -27,6 +27,21 @@ export function summarizeRequiredForms(snapshot: WorkspaceSnapshot): string {
   return snapshot.draft.requiredForms.join(", ");
 }
 
+export function summarizeFilingReadiness(snapshot: WorkspaceSnapshot): string {
+  const federalReadiness = snapshot.filingChecklist.federal.readiness;
+  const stateReadiness = snapshot.filingChecklist.state.readiness;
+
+  if (federalReadiness === "ready" && stateReadiness === "ready") {
+    return "Federal + state ready";
+  }
+
+  if (snapshot.filingChecklist.differsByJurisdiction) {
+    return "Federal/state differ";
+  }
+
+  return "Not ready";
+}
+
 export function buildScenarioChartData(scenarios: TaxScenario[]): readonly { estimatedTax: number; name: string }[] {
   return scenarios.map((scenario) => ({
     estimatedTax: scenario.estimatedFederalTax.amountInCents / 100,

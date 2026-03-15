@@ -75,6 +75,7 @@ const FORM_MAP: Readonly<Record<DocumentKind, readonly TaxFormKey[]>> = {
   "charitable-contribution": ["1040", "schedule-1"],
   "crypto-wallet-export": ["1040", "schedule-d", "form-8949"],
   "other-income": ["1040", "schedule-1"],
+  "prior-year-return": ["1040"],
   "property-tax-statement": ["1040", "schedule-1"],
   "retirement-distribution": ["1040"],
   "schedule-k-1": ["1040", "schedule-1"],

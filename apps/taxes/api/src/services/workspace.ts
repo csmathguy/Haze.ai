@@ -1,5 +1,6 @@
 import {
   AssetLotSchema,
+  buildFilingReadinessChecklist,
   buildQuestionnairePrompts,
   createEmptyTaxReturnDraft,
   createReviewTasksFromDataGaps,
@@ -33,6 +34,10 @@ export async function getWorkspaceSnapshot(options: WorkspacePersistenceOptions 
     documents,
     draft,
     extractions: mapDocumentExtractions(state.extractions),
+    filingChecklist: buildFilingReadinessChecklist({
+      documents,
+      household
+    }),
     generatedAt: new Date().toISOString(),
     household,
     localOnly: true,

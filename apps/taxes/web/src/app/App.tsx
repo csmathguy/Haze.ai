@@ -22,9 +22,10 @@ import type { WorkspaceSnapshot } from "@taxes/shared";
 import { fetchWorkspaceSnapshot, uploadTaxDocument } from "./api.js";
 import { DocumentLedger } from "./components/DocumentLedger.js";
 import { DocumentUploadPanel } from "./components/DocumentUploadPanel.js";
+import { FilingReadinessChecklistPanel } from "./components/FilingReadinessChecklistPanel.js";
 import { ReviewQueuePanel } from "./components/ReviewQueuePanel.js";
 import { StatCard } from "./components/StatCard.js";
-import { buildReviewBanner, summarizeRequiredForms } from "./index.js";
+import { buildReviewBanner, summarizeFilingReadiness, summarizeRequiredForms } from "./index.js";
 
 type ViewKey = "documents" | "holdings" | "overview" | "scenarios";
 const ScenarioPanel = lazy(async () => {
@@ -155,12 +156,13 @@ function OverviewView({ onUpload, snapshot }: UploadViewProps) {
         </Grid>
         <Grid size={{ lg: 3, md: 6, xs: 12 }}>
           <StatCard
-            description="Digital asset workflows are activated when crypto data is detected."
-            label="Digital assets"
-            value={snapshot.household.hasDigitalAssets ? "Enabled" : "Not yet"}
+            description="Federal and state checklist readiness for the current filing year."
+            label="Filing readiness"
+            value={summarizeFilingReadiness(snapshot)}
           />
         </Grid>
       </Grid>
+      <FilingReadinessChecklistPanel checklist={snapshot.filingChecklist} />
       <DocumentUploadPanel disabled={false} onUpload={onUpload} />
       <ReviewQueuePanel reviewQueue={snapshot.reviewQueue.slice(0, 4)} />
     </Stack>
