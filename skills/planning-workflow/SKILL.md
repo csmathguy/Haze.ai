@@ -5,6 +5,8 @@ description: Use this skill when scoping work, creating or refining backlog item
 
 # Planning Workflow
 
+<!-- Recommended model tier: T2 (Sonnet) — requires structured reasoning about work decomposition -->
+
 ## Overview
 
 This skill keeps planning data explicit, reviewable, and durable across worktrees. Use it as the umbrella planning workflow, then prefer `skills/planning-session` for backlog intake and decomposition and `skills/planning-execution` for in-flight work updates.

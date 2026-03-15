@@ -47,13 +47,23 @@ Recommended hooks are documented in `.claude/settings.json.example`. To activate
 
 ### Model Routing
 
-Use the `CLAUDE_CODE_SUBAGENT_MODEL` environment variable to route subagents to a cheaper
-model when the subagent task is research or file exploration rather than reasoning:
+This repository uses a 4-tier model selection system to balance agent capability with token cost.
+Read `docs/model-selection-strategy.md` for the full definitions, task-type routing table, and
+escalation policy. In brief:
+
+- **Tier 1** (Haiku): read-only research, file search, knowledge ops, logging — cheap and fast
+- **Tier 2** (Sonnet): code changes, code review, design, implementation — the standard reasoning tier
+- **Tier 3** (Opus): orchestration, architecture decisions, complex multi-step decomposition — use when T2 fails twice
+- **Tier 0**: future local models via Ollama (not yet working)
+
+To route Claude Code subagents to a cheaper tier for exploration tasks, use the environment variable:
 
 ```bash
 # Route subagents to Haiku when running exploration subagents
 CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5-20251001 claude
 ```
+
+Each skill in `skills/*/SKILL.md` declares its recommended tier with a comment near the top.
 
 ### Context Management
 

@@ -5,6 +5,8 @@ description: Use this skill when work in this repository needs explicit audit lo
 
 # Workflow Audit
 
+<!-- Recommended model tier: T1 (Haiku) — structured logging, no reasoning needed -->
+
 ## Overview
 
 This skill standardizes how agents record what they ran and when they ran it. Use it when you want a reviewable trail for workflow phases, validation commands, and command output logs.

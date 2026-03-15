@@ -62,6 +62,16 @@ npm run agent:worktree:create -- --task review-web-threading --summary "Thread r
 - `workflow-audit`
   - records the audited command trail for substantial implementation work
 
+## Model Tier Assignment
+
+When delegating orchestration and implementation work, use the model tier system to balance capability with cost:
+
+- **Orchestrator role → Tier 3 (Opus)**: Complex decomposition, seam planning, and multi-agent delegation benefit from heavy reasoning. Orchestrators must anticipate dependency chains and avoid merge conflicts. This is a good use of Opus.
+- **Implementer role → Tier 2 (Sonnet)**: Each implementer works within a bounded slice with clear scope. Sonnet has sufficient capability for implementation decisions within that boundary.
+- **Pre-pass/discovery role → Tier 1 (Haiku)**: If you need to explore repo structure or read docs before orchestration, use Haiku to keep setup costs low.
+
+See `docs/model-selection-strategy.md` for the full tier definitions and escalation policy.
+
 ## Recommended Sequence
 
 1. Use `$planning-workflow` to create or refine the work item first.

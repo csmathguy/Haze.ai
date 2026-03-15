@@ -5,6 +5,8 @@ description: Use this skill when implementing one pre-scoped parallel slice insi
 
 # Parallel Work Implementer
 
+<!-- Recommended model tier: T2 (Sonnet) — implementing a single bounded slice with clear scope -->
+
 ## Overview
 
 This skill keeps an implementation agent inside its assigned slice so parallel work stays parallel instead of collapsing back into broad branch edits. It is invoked by the parallel-work-orchestrator for each independent slice.

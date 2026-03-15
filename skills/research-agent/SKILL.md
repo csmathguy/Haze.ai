@@ -5,6 +5,8 @@ description: Use this skill when researching a topic, comparing sources, verifyi
 
 # Research Agent
 
+<!-- Recommended model tier: T1 (Haiku) — read-only research, web fetch, summarization -->
+
 ## Overview
 
 This skill turns ad hoc web searching into a dated, source-ranked workflow that another agent can repeat. Use it when the output needs to stand up as documentation, design input, implementation guidance, or tax-law research notes.

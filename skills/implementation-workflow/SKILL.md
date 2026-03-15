@@ -5,6 +5,8 @@ description: Use this skill when implementing, refactoring, testing, or restruct
 
 # Implementation Workflow
 
+<!-- Recommended model tier: T2 (Sonnet) — code changes require reasoning about design and edge cases -->
+
 ## Overview
 
 This skill keeps code changes aligned with the repository's local-only privacy requirements, architecture boundaries, and quality gates. Use it whenever a task affects behavior, tests, build tooling, or project structure.

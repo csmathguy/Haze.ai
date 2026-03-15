@@ -5,6 +5,8 @@ description: Use this skill when you need to start one or more repository web an
 
 # Local Development Environment
 
+<!-- Recommended model tier: T1 (Haiku) — deterministic startup commands -->
+
 ## Overview
 
 This skill standardizes how agents start the repository's local product environments. The current slice targets the main checkout only, even when the command is launched from a worktree.
