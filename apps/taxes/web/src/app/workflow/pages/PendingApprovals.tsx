@@ -117,61 +117,66 @@ function ApprovalTable({ approvals, respondingTo, onRespond }: ApprovalTableProp
   );
 }
 
-export function PendingApprovals() {
+interface ApprovalsState {
+  approvals: WorkflowApproval[];
+  isLoading: boolean;
+  respondingTo: string | null;
+  snackbar: SnackbarState;
+  handleRespond: (id: string, decision: "approved" | "rejected") => void;
+  handleCloseSnackbar: () => void;
+}
+
+function useApprovalsState(): ApprovalsState {
   const [approvals, setApprovals] = useState<WorkflowApproval[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: "", severity: "success" });
 
   useEffect(() => {
-    void loadApprovals();
+    setIsLoading(true);
+    void fetchPendingApprovals().then((apprvls) => {
+      setApprovals(apprvls);
+      setIsLoading(false);
+    });
   }, []);
 
-  async function loadApprovals(): Promise<void> {
-    setIsLoading(true);
-    const apprvls = await fetchPendingApprovals();
-    setApprovals(apprvls);
-    setIsLoading(false);
+  async function performRespond(approvalId: string, decision: "approved" | "rejected"): Promise<void> {
+    try {
+      const result = await respondToApproval(approvalId, decision, "user@example.com");
+      if (result) {
+        setSnackbar({
+          open: true,
+          message: `Approval ${decision === "approved" ? "approved" : "rejected"} successfully.`,
+          severity: "success"
+        });
+        setApprovals((prev) => prev.filter((a) => a.id !== approvalId));
+      } else {
+        setSnackbar({ open: true, message: "Failed to respond to approval.", severity: "error" });
+      }
+    } catch {
+      setSnackbar({ open: true, message: "Failed to respond to approval.", severity: "error" });
+    } finally {
+      setRespondingTo(null);
+    }
   }
 
   const handleRespond = useCallback(
-    async (approvalId: string, decision: "approved" | "rejected"): Promise<void> => {
+    (approvalId: string, decision: "approved" | "rejected"): void => {
       setRespondingTo(approvalId);
-      try {
-        const result = await respondToApproval(approvalId, decision, "user@example.com");
-        if (result) {
-          setSnackbar({
-            open: true,
-            message: `Approval ${decision === "approved" ? "approved" : "rejected"} successfully.`,
-            severity: "success"
-          });
-          // Remove the approved/rejected item from the list optimistically
-          setApprovals((prev) => prev.filter((a) => a.id !== approvalId));
-        } else {
-          setSnackbar({
-            open: true,
-            message: "Failed to respond to approval.",
-            severity: "error"
-          });
-        }
-      } catch {
-        // sonarjs/no-ignored-exceptions: Error is handled by setting snackbar state
-        // eslint-disable-next-line sonarjs/no-ignored-exceptions
-        setSnackbar({
-          open: true,
-          message: "Failed to respond to approval.",
-          severity: "error"
-        });
-      } finally {
-        setRespondingTo(null);
-      }
+      void performRespond(approvalId, decision);
     },
     []
   );
 
-  function handleCloseSnackbar(): void {
-    setSnackbar({ ...snackbar, open: false });
-  }
+  const handleCloseSnackbar = useCallback((): void => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  return { approvals, isLoading, respondingTo, snackbar, handleRespond, handleCloseSnackbar };
+}
+
+export function PendingApprovals() {
+  const { approvals, isLoading, respondingTo, snackbar, handleRespond, handleCloseSnackbar } = useApprovalsState();
 
   if (isLoading) {
     return (
