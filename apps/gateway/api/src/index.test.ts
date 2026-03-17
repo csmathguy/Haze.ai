@@ -16,6 +16,7 @@ interface TestGatewayContext {
   planningDatabaseUrl: string;
   rootDirectory: string;
   taxesDatabaseUrl: string;
+  workflowDatabaseUrl: string;
 }
 
 async function createTestGatewayContext(prefix: string): Promise<TestGatewayContext> {
@@ -25,12 +26,14 @@ async function createTestGatewayContext(prefix: string): Promise<TestGatewayCont
   const auditDatabaseUrl = buildPrismaSqliteUrl(path.join(rootDirectory, "audit.test.db"));
   const planningDatabaseUrl = buildPrismaSqliteUrl(path.join(rootDirectory, "planning.test.db"));
   const knowledgeDatabaseUrl = buildPrismaSqliteUrl(path.join(rootDirectory, "knowledge.test.db"));
+  const workflowDatabaseUrl = buildPrismaSqliteUrl(path.join(rootDirectory, "workflow.test.db"));
 
   await Promise.all([
     applyPendingMigrations(taxesDatabaseUrl),
     applyPendingMigrations(auditDatabaseUrl),
     applyPendingMigrations(planningDatabaseUrl),
-    applyPendingMigrations(knowledgeDatabaseUrl)
+    applyPendingMigrations(knowledgeDatabaseUrl),
+    applyPendingMigrations(workflowDatabaseUrl)
   ]);
 
   return {
@@ -42,7 +45,8 @@ async function createTestGatewayContext(prefix: string): Promise<TestGatewayCont
     knowledgeDatabaseUrl,
     planningDatabaseUrl,
     rootDirectory,
-    taxesDatabaseUrl
+    taxesDatabaseUrl,
+    workflowDatabaseUrl
   };
 }
 
@@ -137,6 +141,18 @@ describe("buildGatewayApp", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toHaveProperty("workspace");
+
+    await app.close();
+  });
+
+  it("serves workflow definitions route", async () => {
+    const ctx = await createTestGatewayContext("gateway-workflow");
+    contexts.push(ctx);
+    const app = await buildGatewayApp(ctx);
+    const response = await app.inject({ method: "GET", url: "/api/workflow/definitions" });
+
+    expect(response.statusCode).toBe(501);
+    expect(response.json()).toEqual({ error: "not implemented" });
 
     await app.close();
   });
