@@ -6,6 +6,7 @@ import { registerAuditPlugin } from "@taxes/audit-api";
 import { registerCodeReviewPlugin, type CodeReviewService } from "@taxes/code-review-api";
 import { registerKnowledgePlugin } from "@taxes/knowledge-api";
 import { registerPlanPlugin } from "@taxes/plan-api";
+import { registerWorkflowPlugin } from "@taxes/workflow-api";
 
 import {
   AUDIT_DATABASE_URL,
@@ -13,7 +14,8 @@ import {
   KNOWLEDGE_DATABASE_URL,
   PLANNING_DATABASE_URL,
   REPOSITORY_DOCS_ROOT,
-  TAXES_DATABASE_URL
+  TAXES_DATABASE_URL,
+  WORKFLOW_DATABASE_URL
 } from "./config.js";
 
 export interface GatewayOptions {
@@ -23,9 +25,17 @@ export interface GatewayOptions {
   readonly knowledgeDocsRoot?: string;
   readonly planningDatabaseUrl?: string;
   readonly taxesDatabaseUrl?: string;
+  readonly workflowDatabaseUrl?: string;
 }
 
 export async function buildGatewayApp(options: GatewayOptions = {}) {
+  const auditDb = options.auditDatabaseUrl ?? AUDIT_DATABASE_URL;
+  const knowledgeDb = options.knowledgeDatabaseUrl ?? KNOWLEDGE_DATABASE_URL;
+  const planningDb = options.planningDatabaseUrl ?? PLANNING_DATABASE_URL;
+  const taxesDb = options.taxesDatabaseUrl ?? TAXES_DATABASE_URL;
+  const workflowDb = options.workflowDatabaseUrl ?? WORKFLOW_DATABASE_URL;
+  const docsRoot = options.knowledgeDocsRoot ?? REPOSITORY_DOCS_ROOT;
+
   const app = Fastify({ logger: false });
 
   await app.register(cors, { origin: GATEWAY_CORS_ORIGINS });
@@ -33,24 +43,16 @@ export async function buildGatewayApp(options: GatewayOptions = {}) {
   // Single health endpoint covers all domains.
   app.get("/api/health", () => ({ localOnly: true, service: "gateway", status: "ok" }));
 
-  await app.register(registerTaxesPlugin, {
-    databaseUrl: options.taxesDatabaseUrl ?? TAXES_DATABASE_URL
-  });
-  await app.register(registerAuditPlugin, {
-    databaseUrl: options.auditDatabaseUrl ?? AUDIT_DATABASE_URL
-  });
-  await app.register(registerPlanPlugin, {
-    databaseUrl: options.planningDatabaseUrl ?? PLANNING_DATABASE_URL
-  });
-  await app.register(registerKnowledgePlugin, {
-    databaseUrl: options.knowledgeDatabaseUrl ?? KNOWLEDGE_DATABASE_URL,
-    docsRoot: options.knowledgeDocsRoot ?? REPOSITORY_DOCS_ROOT
-  });
+  await app.register(registerTaxesPlugin, { databaseUrl: taxesDb });
+  await app.register(registerAuditPlugin, { databaseUrl: auditDb });
+  await app.register(registerPlanPlugin, { databaseUrl: planningDb });
+  await app.register(registerKnowledgePlugin, { databaseUrl: knowledgeDb, docsRoot });
   await app.register(registerCodeReviewPlugin, {
-    auditDatabaseUrl: options.auditDatabaseUrl ?? AUDIT_DATABASE_URL,
+    auditDatabaseUrl: auditDb,
     ...(options.codeReviewService !== undefined ? { codeReviewService: options.codeReviewService } : {}),
-    planningDatabaseUrl: options.planningDatabaseUrl ?? PLANNING_DATABASE_URL
+    planningDatabaseUrl: planningDb
   });
+  await app.register(registerWorkflowPlugin, { databaseUrl: workflowDb });
 
   return app;
 }
