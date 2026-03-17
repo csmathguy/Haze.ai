@@ -49,7 +49,7 @@ export async function createSkill(prisma: PrismaClient, data: SkillCreateInput):
       category: data.category ?? null,
       inputSchema: data.inputSchema ?? null,
       outputSchema: data.outputSchema ?? null,
-      executionMode: data.executionMode || "agent",
+      executionMode: data.executionMode ?? "agent",
       permissions: data.permissions ?? null,
       status: "active"
     }
