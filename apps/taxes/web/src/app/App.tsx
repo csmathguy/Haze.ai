@@ -121,16 +121,11 @@ export function App() {
 
   return (
     <Box
-      sx={(theme: unknown) => {
-        const t = theme as { palette: { secondary: { main: string } } };
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        const gradientColor = alpha(t.palette.secondary.main, 0.12) as string;
-        return {
-          background: `radial-gradient(circle at top, ${gradientColor}, transparent 30%)`,
-          minHeight: "100vh",
-          py: 5
-        };
-      }}
+      sx={(theme) => ({
+        background: `radial-gradient(circle at top, ${alpha(theme.palette.secondary.main, 0.12)}, transparent 30%)`,
+        minHeight: "100vh",
+        py: 5
+      })}
     >
       <Container maxWidth="xl">
         <Stack spacing={3}>
