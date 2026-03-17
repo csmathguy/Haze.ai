@@ -75,14 +75,14 @@ export async function seedSkills(prisma: PrismaClient): Promise<void> {
       },
       update: {
         description: skill.description,
-        category: skill.category || null,
+        category: skill.category ?? null,
         status: "active"
       },
       create: {
         name: skill.name,
         version: "1.0.0",
         description: skill.description,
-        category: skill.category || null,
+        category: skill.category ?? null,
         status: "active",
         executionMode: "agent"
       }

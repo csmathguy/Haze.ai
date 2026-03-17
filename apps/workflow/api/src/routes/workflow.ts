@@ -25,17 +25,6 @@ const AgentCreateSchema = z.object({
   metadata: z.string().optional()
 });
 
-const AgentUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  model: z.string().optional(),
-  tier: z.string().optional(),
-  allowedSkillIds: z.string().optional(),
-  version: z.string().optional(),
-  metadata: z.string().optional(),
-  status: z.string().optional()
-});
-
 // ============================================================================
 // Zod Schemas for Skill CRUD
 // ============================================================================
@@ -49,18 +38,6 @@ const SkillCreateSchema = z.object({
   outputSchema: z.string().optional(),
   executionMode: z.string().optional(),
   permissions: z.string().optional()
-});
-
-const SkillUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  version: z.string().optional(),
-  description: z.string().optional(),
-  category: z.string().optional(),
-  inputSchema: z.string().optional(),
-  outputSchema: z.string().optional(),
-  executionMode: z.string().optional(),
-  permissions: z.string().optional(),
-  status: z.string().optional()
 });
 
 // ============================================================================
@@ -77,51 +54,27 @@ function notImplemented() {
   return { error: "not implemented" };
 }
 
-export function registerWorkflowRoutes(app: FastifyInstance): void {
-  // Workflow Definitions
-  app.post("/api/workflow/definitions", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
-  app.get("/api/workflow/definitions", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
-  app.get("/api/workflow/definitions/:name", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
+function registerDefinitionStubs(app: FastifyInstance): void {
+  app.post("/api/workflow/definitions", async (_request, reply) => { reply.code(501); return notImplemented(); });
+  app.get("/api/workflow/definitions", async (_request, reply) => { reply.code(501); return notImplemented(); });
+  app.get("/api/workflow/definitions/:name", async (_request, reply) => { reply.code(501); return notImplemented(); });
+}
 
-  // Workflow Runs
-  app.post("/api/workflow/runs", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
-  app.get("/api/workflow/runs", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
-  app.get("/api/workflow/runs/:id", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
-  app.post("/api/workflow/runs/:id/signal", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
-  app.delete("/api/workflow/runs/:id", async (_request, reply) => {
-    reply.code(501);
-    return notImplemented();
-  });
+function registerRunStubs(app: FastifyInstance): void {
+  app.post("/api/workflow/runs", async (_request, reply) => { reply.code(501); return notImplemented(); });
+  app.get("/api/workflow/runs", async (_request, reply) => { reply.code(501); return notImplemented(); });
+  app.get("/api/workflow/runs/:id", async (_request, reply) => { reply.code(501); return notImplemented(); });
+  app.post("/api/workflow/runs/:id/signal", async (_request, reply) => { reply.code(501); return notImplemented(); });
+  app.delete("/api/workflow/runs/:id", async (_request, reply) => { reply.code(501); return notImplemented(); });
+}
 
-  // Workflow Events
+function registerEventRoutes(app: FastifyInstance): void {
   app.get("/api/workflow/events", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const params = z.object({
         runId: z.string().optional(),
         limit: z.coerce.number().int().positive().default(50)
       }).parse(request.query);
-
       const prisma = await getWorkflowPrismaClient();
       try {
         const events = await prisma.workflowEvent.findMany({
@@ -141,9 +94,10 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       throw error;
     }
   });
+}
 
-  // Agents
-  app.get("/api/workflow/agents", async (_request: FastifyRequest, _reply: FastifyReply) => {
+function registerAgentRoutes(app: FastifyInstance): void {
+  app.get("/api/workflow/agents", async () => {
     const prisma = await getWorkflowPrismaClient();
     try {
       return { agents: await agentService.listAgents(prisma) };
@@ -164,10 +118,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
         await prisma.$disconnect();
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        reply.code(400);
-        return { error: "Invalid request body", details: error.issues };
-      }
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid request body", details: error.issues }; }
       throw error;
     }
   });
@@ -178,25 +129,20 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       const prisma = await getWorkflowPrismaClient();
       try {
         const agent = await agentService.getAgent(prisma, id);
-        if (!agent) {
-          reply.code(404);
-          return { error: "Agent not found" };
-        }
+        if (!agent) { reply.code(404); return { error: "Agent not found" }; }
         return { agent };
       } finally {
         await prisma.$disconnect();
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        reply.code(400);
-        return { error: "Invalid request params", details: error.issues };
-      }
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid request params", details: error.issues }; }
       throw error;
     }
   });
+}
 
-  // Skills
-  app.get("/api/workflow/skills", async (_request: FastifyRequest, _reply: FastifyReply) => {
+function registerSkillRoutes(app: FastifyInstance): void {
+  app.get("/api/workflow/skills", async () => {
     const prisma = await getWorkflowPrismaClient();
     try {
       return { skills: await skillService.listSkills(prisma) };
@@ -217,10 +163,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
         await prisma.$disconnect();
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        reply.code(400);
-        return { error: "Invalid request body", details: error.issues };
-      }
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid request body", details: error.issues }; }
       throw error;
     }
   });
@@ -231,24 +174,19 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
       const prisma = await getWorkflowPrismaClient();
       try {
         const skill = await skillService.getSkill(prisma, id);
-        if (!skill) {
-          reply.code(404);
-          return { error: "Skill not found" };
-        }
+        if (!skill) { reply.code(404); return { error: "Skill not found" }; }
         return { skill };
       } finally {
         await prisma.$disconnect();
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        reply.code(400);
-        return { error: "Invalid request params", details: error.issues };
-      }
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid request params", details: error.issues }; }
       throw error;
     }
   });
+}
 
-  // Approvals
+function registerApprovalRoutes(app: FastifyInstance): void {
   app.get("/api/workflow/approvals", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { runId } = z.object({ runId: z.string().optional() }).parse(request.query);
@@ -262,10 +200,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
         await prisma.$disconnect();
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        reply.code(400);
-        return { error: "Invalid query parameters", details: error.issues };
-      }
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid query parameters", details: error.issues }; }
       throw error;
     }
   });
@@ -287,15 +222,18 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
         await prisma.$disconnect();
       }
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        reply.code(400);
-        return { error: "Invalid request", details: error.issues };
-      }
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid request", details: error.issues }; }
       throw error;
     }
   });
 }
 
-// Suppress unused schema warnings — these will be used when update routes are implemented
-void AgentUpdateSchema;
-void SkillUpdateSchema;
+export function registerWorkflowRoutes(app: FastifyInstance): void {
+  registerDefinitionStubs(app);
+  registerRunStubs(app);
+  registerEventRoutes(app);
+  registerAgentRoutes(app);
+  registerSkillRoutes(app);
+  registerApprovalRoutes(app);
+}
+

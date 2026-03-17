@@ -3,11 +3,11 @@ import { seedAgents } from "./agents.js";
 import { seedSkills } from "./skills.js";
 
 export async function seedDatabase(prisma: PrismaClient): Promise<void> {
-  console.log("Seeding agents...");
+  console.warn("Seeding agents...");
   await seedAgents(prisma);
-  console.log("Agents seeded successfully.");
+  console.warn("Agents seeded successfully.");
 
-  console.log("Seeding skills...");
+  console.warn("Seeding skills...");
   await seedSkills(prisma);
-  console.log("Skills seeded successfully.");
+  console.warn("Skills seeded successfully.");
 }

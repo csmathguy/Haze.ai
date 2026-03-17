@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@taxes/db";
-import { getWorkflowPrismaClient, disconnectWorkflowPrismaClient } from "../db/client.js";
+import { getPrismaClient } from "@taxes/db";
+import { applyPendingMigrations } from "../db/migrations.js";
 import {
   createApproval,
   getApproval,
@@ -13,11 +17,14 @@ describe("approval-service", () => {
   let db: PrismaClient;
 
   beforeAll(async () => {
-    db = await getWorkflowPrismaClient();
+    const testDbFile = join(tmpdir(), `approval-test-${randomUUID()}.db`);
+    const testDbUrl = `file:${testDbFile}`;
+    await applyPendingMigrations(testDbUrl);
+    db = await getPrismaClient(testDbUrl);
   });
 
   afterAll(async () => {
-    await disconnectWorkflowPrismaClient();
+    await db.$disconnect();
   });
 
   it("creates an approval", async () => {
@@ -141,8 +148,9 @@ describe("approval-service", () => {
 
     expect(events.length).toBe(1);
 
-    const event = events[0]!;
-    expect(event.type).toBe("approval.responded");
+    const event = events[0];
+    expect(event).toBeDefined();
+    expect(event?.type).toBe("approval.responded");
     expect(event.correlationId).toBe("run_test_007");
 
     const payload = JSON.parse(event.payload) as Record<string, unknown>;
