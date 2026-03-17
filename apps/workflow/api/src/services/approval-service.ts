@@ -10,7 +10,7 @@ export interface CreateApprovalInput {
 export interface RespondToApprovalInput {
   decision: "approved" | "rejected";
   respondedBy: string;
-  notes?: string;
+  notes?: string | undefined;
 }
 
 /**

@@ -29,9 +29,9 @@ interface SnackbarState {
 }
 
 interface ApprovalTableRowProps {
-  approval: WorkflowApproval;
-  isResponding: boolean;
-  onRespond: (id: string, decision: "approved" | "rejected") => void;
+  readonly approval: WorkflowApproval;
+  readonly isResponding: boolean;
+  readonly onRespond: (id: string, decision: "approved" | "rejected") => void;
 }
 
 function ApprovalTableRow({ approval, isResponding, onRespond }: ApprovalTableRowProps) {
@@ -61,7 +61,7 @@ function ApprovalTableRow({ approval, isResponding, onRespond }: ApprovalTableRo
             color="success"
             disabled={isResponding}
             endIcon={<CheckCircleOutlinedIcon />}
-            onClick={() => onRespond(approval.id, "approved")}
+            onClick={() => { onRespond(approval.id, "approved"); }}
             size="small"
             variant="outlined"
           >
@@ -71,7 +71,7 @@ function ApprovalTableRow({ approval, isResponding, onRespond }: ApprovalTableRo
             color="error"
             disabled={isResponding}
             endIcon={<CancelOutlinedIcon />}
-            onClick={() => onRespond(approval.id, "rejected")}
+            onClick={() => { onRespond(approval.id, "rejected"); }}
             size="small"
             variant="outlined"
           >
@@ -84,9 +84,9 @@ function ApprovalTableRow({ approval, isResponding, onRespond }: ApprovalTableRo
 }
 
 interface ApprovalTableProps {
-  approvals: WorkflowApproval[];
-  respondingTo: string | null;
-  onRespond: (id: string, decision: "approved" | "rejected") => void;
+  readonly approvals: WorkflowApproval[];
+  readonly respondingTo: string | null;
+  readonly onRespond: (id: string, decision: "approved" | "rejected") => void;
 }
 
 function ApprovalTable({ approvals, respondingTo, onRespond }: ApprovalTableProps) {
