@@ -2,25 +2,25 @@ import type { Skill, PrismaClient } from "@taxes/db";
 
 export interface SkillCreateInput {
   name: string;
-  version?: string;
-  description?: string;
-  category?: string;
-  inputSchema?: string;
-  outputSchema?: string;
-  executionMode?: string;
-  permissions?: string;
+  version?: string | undefined;
+  description?: string | undefined;
+  category?: string | undefined;
+  inputSchema?: string | undefined;
+  outputSchema?: string | undefined;
+  executionMode?: string | undefined;
+  permissions?: string | undefined;
 }
 
 export interface SkillUpdateInput {
   name?: string;
-  version?: string;
-  description?: string;
-  category?: string;
-  inputSchema?: string;
-  outputSchema?: string;
-  executionMode?: string;
-  permissions?: string;
-  status?: string;
+  version?: string | undefined;
+  description?: string | undefined;
+  category?: string | undefined;
+  inputSchema?: string | undefined;
+  outputSchema?: string | undefined;
+  executionMode?: string | undefined;
+  permissions?: string | undefined;
+  status?: string | undefined;
 }
 
 export async function listSkills(prisma: PrismaClient): Promise<Skill[]> {
@@ -44,13 +44,13 @@ export async function createSkill(prisma: PrismaClient, data: SkillCreateInput):
   return prisma.skill.create({
     data: {
       name: data.name,
-      version: data.version || "1.0.0",
-      description: data.description,
-      category: data.category,
-      inputSchema: data.inputSchema,
-      outputSchema: data.outputSchema,
+      version: data.version ?? "1.0.0",
+      description: data.description ?? null,
+      category: data.category ?? null,
+      inputSchema: data.inputSchema ?? null,
+      outputSchema: data.outputSchema ?? null,
       executionMode: data.executionMode || "agent",
-      permissions: data.permissions,
+      permissions: data.permissions ?? null,
       status: "active"
     }
   });

@@ -126,7 +126,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     } catch (error) {
       if (error instanceof z.ZodError) {
         reply.code(400);
-        return { error: "Invalid query parameters", details: error.errors };
+        return { error: "Invalid query parameters", details: error.issues };
       }
       throw error;
     }
@@ -157,7 +157,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     } catch (error) {
       if (error instanceof z.ZodError) {
         reply.code(400);
-        return { error: "Invalid request body", details: error.errors };
+        return { error: "Invalid request body", details: error.issues };
       }
       throw error;
     }
@@ -180,7 +180,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     } catch (error) {
       if (error instanceof z.ZodError) {
         reply.code(400);
-        return { error: "Invalid request params", details: error.errors };
+        return { error: "Invalid request params", details: error.issues };
       }
       throw error;
     }
@@ -211,7 +211,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     } catch (error) {
       if (error instanceof z.ZodError) {
         reply.code(400);
-        return { error: "Invalid request body", details: error.errors };
+        return { error: "Invalid request body", details: error.issues };
       }
       throw error;
     }
@@ -234,7 +234,7 @@ export function registerWorkflowRoutes(app: FastifyInstance): void {
     } catch (error) {
       if (error instanceof z.ZodError) {
         reply.code(400);
-        return { error: "Invalid request params", details: error.errors };
+        return { error: "Invalid request params", details: error.issues };
       }
       throw error;
     }

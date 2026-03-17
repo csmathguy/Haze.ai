@@ -2,23 +2,23 @@ import type { Agent, PrismaClient } from "@taxes/db";
 
 export interface AgentCreateInput {
   name: string;
-  description?: string;
-  model?: string;
-  tier?: string;
-  allowedSkillIds?: string;
-  version?: string;
-  metadata?: string;
+  description?: string | undefined;
+  model?: string | undefined;
+  tier?: string | undefined;
+  allowedSkillIds?: string | undefined;
+  version?: string | undefined;
+  metadata?: string | undefined;
 }
 
 export interface AgentUpdateInput {
   name?: string;
-  description?: string;
-  model?: string;
-  tier?: string;
-  allowedSkillIds?: string;
-  version?: string;
-  metadata?: string;
-  status?: string;
+  description?: string | undefined;
+  model?: string | undefined;
+  tier?: string | undefined;
+  allowedSkillIds?: string | undefined;
+  version?: string | undefined;
+  metadata?: string | undefined;
+  status?: string | undefined;
 }
 
 export async function listAgents(prisma: PrismaClient): Promise<Agent[]> {
@@ -42,12 +42,12 @@ export async function createAgent(prisma: PrismaClient, data: AgentCreateInput):
   return prisma.agent.create({
     data: {
       name: data.name,
-      description: data.description,
-      model: data.model || data.name,
-      tier: data.tier || "2",
-      allowedSkillIds: data.allowedSkillIds,
-      version: data.version || "1.0.0",
-      metadata: data.metadata,
+      description: data.description ?? null,
+      model: data.model ?? data.name,
+      tier: data.tier ?? "2",
+      allowedSkillIds: data.allowedSkillIds ?? null,
+      version: data.version ?? "1.0.0",
+      metadata: data.metadata ?? null,
       status: "active"
     }
   });
