@@ -21,10 +21,12 @@ export interface WorkflowRunSummary {
 export interface WorkflowApproval {
   id: string;
   runId: string;
-  nodeId: string;
-  nodeName: string;
-  message?: string;
-  createdAt: string;
+  stepId: string;
+  status: string;
+  prompt: string;
+  responseJson?: string | null;
+  requestedAt: string;
+  respondedAt?: string | null;
 }
 
 export interface WorkflowRunDetail {
@@ -125,10 +127,16 @@ export async function fetchWorkflowRun(id: string): Promise<WorkflowRunDetail | 
 
 /**
  * Fetch pending approval gates.
+ * Optionally filter by runId.
  */
-export async function fetchPendingApprovals(): Promise<WorkflowApproval[]> {
+export async function fetchPendingApprovals(runId?: string): Promise<WorkflowApproval[]> {
   try {
-    const response = await fetch("/api/workflow/approvals");
+    const url = new URL("/api/workflow/approvals", window.location.origin);
+    if (runId !== undefined) {
+      url.searchParams.set("runId", runId);
+    }
+
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
       console.warn(`Workflow approvals request failed with ${response.status.toString()}.`);
@@ -140,5 +148,40 @@ export async function fetchPendingApprovals(): Promise<WorkflowApproval[]> {
   } catch (error) {
     console.warn("Failed to fetch workflow approvals:", error);
     return [];
+  }
+}
+
+/**
+ * Respond to an approval (approve or reject).
+ */
+export async function respondToApproval(
+  approvalId: string,
+  decision: "approved" | "rejected",
+  respondedBy: string,
+  notes?: string
+): Promise<WorkflowApproval | null> {
+  try {
+    const response = await fetch(`/api/workflow/approvals/${encodeURIComponent(approvalId)}/respond`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        decision,
+        respondedBy,
+        notes: notes ?? null
+      })
+    });
+
+    if (!response.ok) {
+      console.warn(`Respond to approval request failed with ${response.status.toString()}.`);
+      return null;
+    }
+
+    const payload = (await response.json()) as { approval: WorkflowApproval };
+    return payload.approval;
+  } catch (error) {
+    console.warn("Failed to respond to approval:", error);
+    return null;
   }
 }
