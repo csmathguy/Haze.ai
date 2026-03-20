@@ -3,7 +3,7 @@ import type { WorkflowDefinition as PrismaWorkflowDefinition, PrismaClient } fro
 export interface WorkflowDefinitionCreateInput {
   name: string;
   version: string;
-  description?: string;
+  description?: string | undefined;
   triggers: string[];
   definitionJson: Record<string, unknown>;
 }
@@ -53,5 +53,5 @@ export async function getDefinitionByName(
     take: 1
   });
 
-  return definitions.length > 0 ? definitions[0] : null;
+  return definitions[0] ?? null;
 }

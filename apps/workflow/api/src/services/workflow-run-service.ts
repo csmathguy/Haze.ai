@@ -1,5 +1,5 @@
 import type { WorkflowRun as PrismaWorkflowRun, PrismaClient } from "@taxes/db";
-import type { WorkflowDefinition, WorkflowEvent } from "@taxes/shared";
+import type { WorkflowEvent, WorkflowRun } from "@taxes/shared";
 import { WorkflowEngine } from "@taxes/shared";
 
 import { EventBus } from "../event-bus/event-bus.js";
@@ -7,7 +7,7 @@ import * as workflowDefinitionService from "./workflow-definition-service.js";
 
 export interface StartRunInput {
   definitionName: string;
-  input: unknown;
+  input?: unknown;
 }
 
 export interface SignalRunInput {
@@ -16,26 +16,26 @@ export interface SignalRunInput {
 }
 
 export interface ListRunsOptions {
-  status?: string;
-  limit?: number;
+  status?: string | undefined;
+  limit?: number | undefined;
 }
 
 export async function startRun(
   prisma: PrismaClient,
   data: StartRunInput
-): Promise<{ run: PrismaWorkflowRun; effects: Record<string, unknown>[] }> {
+): Promise<{ run: PrismaWorkflowRun; effects: unknown[] }> {
   const definition = await workflowDefinitionService.getDefinitionByName(
     prisma,
     data.definitionName
   );
 
   if (!definition) {
-    throw new Error(`Workflow definition not found: ${data.definitionName}`);
+    throw new Error("Workflow definition not found: " + data.definitionName);
   }
 
   const definitionJson = JSON.parse(definition.definitionJson) as Record<string, unknown>;
 
-  const workflowDefinition: WorkflowDefinition = {
+  const workflowDefinition = {
     name: definition.name,
     version: definition.version,
     triggers: JSON.parse(definition.triggerEvents) as string[],
@@ -44,7 +44,7 @@ export async function startRun(
   };
 
   const engine = new WorkflowEngine();
-  const effect = engine.startRun(workflowDefinition, data.input);
+  const effect = engine.startRun(workflowDefinition, data.input ?? null);
 
   const persistedRun = await prisma.workflowRun.create({
     data: {
@@ -72,7 +72,7 @@ export async function startRun(
 
   return {
     run: persistedRun,
-    effects: effect.effects
+    effects: effect.effects as unknown[]
   };
 }
 
@@ -90,7 +90,7 @@ export async function listRuns(
   options?: ListRunsOptions
 ): Promise<PrismaWorkflowRun[]> {
   return prisma.workflowRun.findMany({
-    where: options?.status ? { status: options.status } : {},
+    where: options?.status !== undefined ? { status: options.status } : {},
     orderBy: { startedAt: "desc" },
     take: options?.limit ?? 50
   });
@@ -99,29 +99,25 @@ export async function listRuns(
 export async function signalRun(
   prisma: PrismaClient,
   data: SignalRunInput
-): Promise<{ run: PrismaWorkflowRun; effects: Record<string, unknown>[] }> {
+): Promise<{ run: PrismaWorkflowRun; effects: unknown[] }> {
   const run = await prisma.workflowRun.findUnique({
     where: { id: data.runId }
   });
 
   if (!run) {
-    throw new Error(`Workflow run not found: ${data.runId}`);
+    throw new Error("Workflow run not found: " + data.runId);
   }
 
   const workflowRun = convertPrismaRunToWorkflowRun(run);
   const engine = new WorkflowEngine();
   const effect = engine.signalRun(workflowRun, data.event);
 
-  const contextToStore = typeof effect.nextRun.contextJson === "string"
-    ? effect.nextRun.contextJson
-    : JSON.stringify(effect.nextRun.contextJson);
-
   const updatedRun = await prisma.workflowRun.update({
     where: { id: data.runId },
     data: {
       status: effect.nextRun.status,
       currentStep: effect.nextRun.currentStepId ?? null,
-      contextJson: contextToStore,
+      contextJson: JSON.stringify(effect.nextRun.contextJson),
       updatedAt: new Date(effect.nextRun.updatedAt),
       completedAt: effect.nextRun.completedAt ? new Date(effect.nextRun.completedAt) : null
     }
@@ -140,20 +136,20 @@ export async function signalRun(
 
   return {
     run: updatedRun,
-    effects: effect.effects
+    effects: effect.effects as unknown[]
   };
 }
 
 export async function cancelRun(
   prisma: PrismaClient,
   runId: string
-): Promise<{ run: PrismaWorkflowRun; effects: Record<string, unknown>[] }> {
+): Promise<{ run: PrismaWorkflowRun; effects: unknown[] }> {
   const run = await prisma.workflowRun.findUnique({
     where: { id: runId }
   });
 
   if (!run) {
-    throw new Error(`Workflow run not found: ${runId}`);
+    throw new Error("Workflow run not found: " + runId);
   }
 
   const workflowRun = convertPrismaRunToWorkflowRun(run);
@@ -171,19 +167,26 @@ export async function cancelRun(
 
   return {
     run: updatedRun,
-    effects: effect.effects
+    effects: effect.effects as unknown[]
   };
 }
 
-function convertPrismaRunToWorkflowRun(
-  run: PrismaWorkflowRun
-): PrismaWorkflowRun {
-  const contextJson = typeof run.contextJson === "string"
+function convertPrismaRunToWorkflowRun(run: PrismaWorkflowRun): WorkflowRun {
+  const contextJson = run.contextJson !== null
     ? (JSON.parse(run.contextJson) as Record<string, unknown>)
-    : (run.contextJson as Record<string, unknown>);
+    : {};
 
   return {
-    ...run,
-    contextJson: JSON.stringify(contextJson)
-  } as PrismaWorkflowRun;
+    id: run.id,
+    definitionName: run.definitionName,
+    version: run.version,
+    status: run.status as WorkflowRun["status"],
+    ...(run.currentStep !== null ? { currentStepId: run.currentStep } : {}),
+    contextJson,
+    ...(run.correlationId !== null ? { correlationId: run.correlationId } : {}),
+    ...(run.parentRunId !== null ? { parentRunId: run.parentRunId } : {}),
+    startedAt: run.startedAt.toISOString(),
+    updatedAt: run.updatedAt.toISOString(),
+    ...(run.completedAt !== null ? { completedAt: run.completedAt.toISOString() } : {})
+  };
 }

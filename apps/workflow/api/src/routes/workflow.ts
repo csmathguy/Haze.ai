@@ -39,7 +39,7 @@ const WorkflowDefinitionCreateSchema = z.object({
   version: z.string().min(1),
   description: z.string().optional(),
   triggers: z.array(z.string().min(1)),
-  definitionJson: z.record(z.unknown())
+  definitionJson: z.record(z.string(), z.unknown())
 });
 
 const WorkflowRunCreateSchema = z.object({
@@ -50,7 +50,7 @@ const WorkflowRunCreateSchema = z.object({
 const WorkflowRunSignalSchema = z.object({
   type: z.string().min(1),
   correlationKey: z.string().optional(),
-  payload: z.record(z.unknown()).optional()
+  payload: z.record(z.string(), z.unknown()).optional()
 });
 
 const WorkflowRunListParamsSchema = z.object({
@@ -64,11 +64,12 @@ const RespondApprovalBodySchema = z.object({
   notes: z.string().optional()
 });
 
-function registerDefinitionRoutes(app: FastifyInstance): void {
+function registerDefinitionRoutes(app: FastifyInstance, databaseUrl?: string): void {
   app.post("/api/workflow/definitions", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const body = WorkflowDefinitionCreateSchema.parse(request.body);
-      const prisma = await getWorkflowPrismaClient();
+      const rawBody = WorkflowDefinitionCreateSchema.parse(request.body);
+      const body = { ...rawBody, ...(rawBody.description !== undefined ? { description: rawBody.description } : {}) } as typeof rawBody;
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const definition = await workflowDefinitionService.createDefinition(prisma, body);
         reply.code(201);
@@ -81,7 +82,7 @@ function registerDefinitionRoutes(app: FastifyInstance): void {
   });
 
   app.get("/api/workflow/definitions", async () => {
-    const prisma = await getWorkflowPrismaClient();
+    const prisma = await getWorkflowPrismaClient(databaseUrl);
     try { return { definitions: await workflowDefinitionService.listDefinitions(prisma) }; }
     finally { await prisma.$disconnect(); }
   });
@@ -89,7 +90,7 @@ function registerDefinitionRoutes(app: FastifyInstance): void {
   app.get("/api/workflow/definitions/:name", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { name } = z.object({ name: z.string() }).parse(request.params);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const definition = await workflowDefinitionService.getDefinitionByName(prisma, name);
         if (!definition) { reply.code(404); return { error: "Definition not found" }; }
@@ -102,13 +103,13 @@ function registerDefinitionRoutes(app: FastifyInstance): void {
   });
 }
 
-function registerRunRoutes(app: FastifyInstance): void {
+function registerRunRoutes(app: FastifyInstance, databaseUrl?: string): void {
   app.post("/api/workflow/runs", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = WorkflowRunCreateSchema.parse(request.body);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
-        const result = await workflowRunService.startRun(prisma, body);
+        const result = await workflowRunService.startRun(prisma, { definitionName: body.definitionName, ...(body.input !== undefined ? { input: body.input } : {}) });
         reply.code(201);
         return { run: result.run, effects: result.effects };
       } finally { await prisma.$disconnect(); }
@@ -122,9 +123,9 @@ function registerRunRoutes(app: FastifyInstance): void {
   app.get("/api/workflow/runs", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const params = WorkflowRunListParamsSchema.parse(request.query);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
-        return { runs: await workflowRunService.listRuns(prisma, { status: params.status, limit: params.limit }) };
+        return { runs: await workflowRunService.listRuns(prisma, { ...(params.status !== undefined ? { status: params.status } : {}), limit: params.limit }) };
       } finally { await prisma.$disconnect(); }
     } catch (error) {
       if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid query parameters", details: error.issues }; }
@@ -135,7 +136,7 @@ function registerRunRoutes(app: FastifyInstance): void {
   app.get("/api/workflow/runs/:id", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(request.params);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const run = await workflowRunService.getRun(prisma, id);
         if (!run) { reply.code(404); return { error: "Run not found" }; }
@@ -151,11 +152,11 @@ function registerRunRoutes(app: FastifyInstance): void {
     try {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const body = WorkflowRunSignalSchema.parse(request.body);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const result = await workflowRunService.signalRun(prisma, {
           runId: id,
-          event: { type: body.type, correlationKey: body.correlationKey, payload: body.payload }
+          event: { type: body.type, ...(body.correlationKey !== undefined ? { correlationKey: body.correlationKey } : {}), ...(body.payload !== undefined ? { payload: body.payload } : {}) }
         });
         return { run: result.run, effects: result.effects };
       } finally { await prisma.$disconnect(); }
@@ -169,7 +170,7 @@ function registerRunRoutes(app: FastifyInstance): void {
   app.delete("/api/workflow/runs/:id", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(request.params);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const result = await workflowRunService.cancelRun(prisma, id);
         return { run: result.run, effects: result.effects };
@@ -182,14 +183,14 @@ function registerRunRoutes(app: FastifyInstance): void {
   });
 }
 
-function registerEventRoutes(app: FastifyInstance): void {
+function registerEventRoutes(app: FastifyInstance, databaseUrl?: string): void {
   app.get("/api/workflow/events", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const params = z.object({
         runId: z.string().optional(),
         limit: z.coerce.number().int().positive().default(50)
       }).parse(request.query);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const events = await prisma.workflowEvent.findMany({
           where: params.runId ? { correlationId: params.runId } : {},
@@ -205,9 +206,9 @@ function registerEventRoutes(app: FastifyInstance): void {
   });
 }
 
-function registerAgentRoutes(app: FastifyInstance): void {
+function registerAgentRoutes(app: FastifyInstance, databaseUrl?: string): void {
   app.get("/api/workflow/agents", async () => {
-    const prisma = await getWorkflowPrismaClient();
+    const prisma = await getWorkflowPrismaClient(databaseUrl);
     try { return { agents: await agentService.listAgents(prisma) }; }
     finally { await prisma.$disconnect(); }
   });
@@ -215,7 +216,7 @@ function registerAgentRoutes(app: FastifyInstance): void {
   app.post("/api/workflow/agents", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = AgentCreateSchema.parse(request.body);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try { const agent = await agentService.createAgent(prisma, body); reply.code(201); return { agent }; }
       finally { await prisma.$disconnect(); }
     } catch (error) {
@@ -227,7 +228,7 @@ function registerAgentRoutes(app: FastifyInstance): void {
   app.get("/api/workflow/agents/:id", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(request.params);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const agent = await agentService.getAgent(prisma, id);
         if (!agent) { reply.code(404); return { error: "Agent not found" }; }
@@ -240,9 +241,9 @@ function registerAgentRoutes(app: FastifyInstance): void {
   });
 }
 
-function registerSkillRoutes(app: FastifyInstance): void {
+function registerSkillRoutes(app: FastifyInstance, databaseUrl?: string): void {
   app.get("/api/workflow/skills", async () => {
-    const prisma = await getWorkflowPrismaClient();
+    const prisma = await getWorkflowPrismaClient(databaseUrl);
     try { return { skills: await skillService.listSkills(prisma) }; }
     finally { await prisma.$disconnect(); }
   });
@@ -250,7 +251,7 @@ function registerSkillRoutes(app: FastifyInstance): void {
   app.post("/api/workflow/skills", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = SkillCreateSchema.parse(request.body);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try { const skill = await skillService.createSkill(prisma, body); reply.code(201); return { skill }; }
       finally { await prisma.$disconnect(); }
     } catch (error) {
@@ -262,7 +263,7 @@ function registerSkillRoutes(app: FastifyInstance): void {
   app.get("/api/workflow/skills/:id", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(request.params);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const skill = await skillService.getSkill(prisma, id);
         if (!skill) { reply.code(404); return { error: "Skill not found" }; }
@@ -275,11 +276,11 @@ function registerSkillRoutes(app: FastifyInstance): void {
   });
 }
 
-function registerApprovalRoutes(app: FastifyInstance): void {
+function registerApprovalRoutes(app: FastifyInstance, databaseUrl?: string): void {
   app.get("/api/workflow/approvals", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const { runId } = z.object({ runId: z.string().optional() }).parse(request.query);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const approvals = runId !== undefined
           ? await approvalService.listPendingApprovalsByRun(prisma, runId)
@@ -296,7 +297,7 @@ function registerApprovalRoutes(app: FastifyInstance): void {
     try {
       const { id } = z.object({ id: z.string() }).parse(request.params);
       const body = RespondApprovalBodySchema.parse(request.body);
-      const prisma = await getWorkflowPrismaClient();
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
       try {
         const approval = await approvalService.respondToApproval(prisma, id, {
           decision: body.decision,
@@ -313,11 +314,12 @@ function registerApprovalRoutes(app: FastifyInstance): void {
   });
 }
 
-export function registerWorkflowRoutes(app: FastifyInstance): void {
-  registerDefinitionRoutes(app);
-  registerRunRoutes(app);
-  registerEventRoutes(app);
-  registerAgentRoutes(app);
-  registerSkillRoutes(app);
-  registerApprovalRoutes(app);
+export function registerWorkflowRoutes(app: FastifyInstance, options?: { databaseUrl?: string | undefined }): void {
+  const db = options?.databaseUrl;
+  registerDefinitionRoutes(app, db);
+  registerRunRoutes(app, db);
+  registerEventRoutes(app, db);
+  registerAgentRoutes(app, db);
+  registerSkillRoutes(app, db);
+  registerApprovalRoutes(app, db);
 }
