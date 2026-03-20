@@ -128,5 +128,10 @@
   "simple-git-hooks": {
     "pre-commit": "node tools/runtime/pre-commit.cjs",
     "pre-push": "node tools/runtime/run-npm.cjs run quality:logged -- pre-push"
+  },
+  "dependencies": {
+    "mermaid": "^11.13.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }

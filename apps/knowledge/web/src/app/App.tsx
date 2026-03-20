@@ -1,77 +1,98 @@
-import { useDeferredValue, useEffect, useState } from "react";
+/* eslint-disable max-lines-per-function */
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Alert, Box, Button, Container, Paper, Stack, Typography } from "@mui/material";
-import type {
-  CreateKnowledgeEntryDraftInput,
-  CreateKnowledgeSubjectDraftInput,
-  KnowledgeWorkspace
-} from "@taxes/shared";
+import {
+  Alert,
+  Box,
+  Button,
+  Container,
+  IconButton,
+  Paper,
+  Stack,
+  Tooltip,
+  Typography
+} from "@mui/material";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import type { CreateKnowledgeEntryDraftInput, CreateKnowledgeSubjectDraftInput, KnowledgeEntry, KnowledgeWorkspace } from "@taxes/shared";
 
 import { createKnowledgeEntry, createKnowledgeSubject, syncRepositoryDocs } from "./api.js";
-import { DetailPanel } from "./components/DetailPanel.js";
-import { EntriesPanel } from "./components/EntriesPanel.js";
+import { EntriesTable } from "./components/EntriesTable.js";
+import { KnowledgeDrawer } from "./components/KnowledgeDrawer.js";
 import { SubjectsPanel } from "./components/SubjectsPanel.js";
 import { SummaryStrip } from "./components/SummaryStrip.js";
 import { filterEntries, refreshWorkspace, runMutation } from "./model.js";
 
-export function App() {
+type DrawerMode = "create" | "detail" | null;
+
+export function App({
+  colorMode,
+  onColorModeChange
+}: {
+  readonly colorMode: "dark" | "light";
+  readonly onColorModeChange: (value: "dark" | "light") => void;
+}) {
   const controller = useKnowledgeWorkspaceController();
 
   return (
-    <Box
-      sx={{
-        background:
-          "radial-gradient(circle at top left, color-mix(in srgb, var(--mui-palette-secondary-main) 18%, transparent), transparent 28%), radial-gradient(circle at top right, color-mix(in srgb, var(--mui-palette-primary-main) 12%, transparent), transparent 32%), linear-gradient(180deg, var(--mui-palette-background-default) 0%, var(--mui-palette-background-paper) 100%)",
-        minHeight: "100vh",
-        pb: 5,
-        pt: 5
-      }}
-    >
+    <Shell>
       <Container maxWidth="xl">
         <Stack spacing={3}>
-          <Header onRepoSync={controller.handleRepoSync} />
+          <Header
+            colorMode={colorMode}
+            onColorModeChange={onColorModeChange}
+            onCreateResearch={() => {
+              controller.openDrawer("create");
+            }}
+            onRepoSync={controller.handleRepoSync}
+          />
           {controller.successMessage === null ? null : <Alert severity="success">{controller.successMessage}</Alert>}
           {controller.errorMessage === null ? null : <Alert severity="error">{controller.errorMessage}</Alert>}
           <SummaryStrip workspace={controller.workspace} />
-          <Box
-            sx={{
-              display: "grid",
-              gap: 2,
-              gridTemplateColumns: { lg: "1.15fr 1.35fr 1.5fr", xs: "1fr" }
-            }}
-          >
-            <Panel>
-              <SubjectsPanel
-                isBusy={controller.isBusy}
-                onCreate={controller.handleSubjectCreate}
-                selectedSubjectId={controller.selectedSubjectId}
-                setSelectedSubjectId={controller.setSelectedSubjectId}
-                subjects={controller.workspace?.subjects ?? []}
-              />
-            </Panel>
-            <Panel>
-              <EntriesPanel
-                entries={controller.filteredEntries}
-                kindFilter={controller.kindFilter}
-                search={controller.search}
-                selectedEntryId={controller.selectedEntry?.id ?? null}
-                selectedSubjectId={controller.selectedSubjectId}
-                setKindFilter={controller.setKindFilter}
-                setSearch={controller.setSearch}
-                setSelectedEntryId={controller.setSelectedEntryId}
-              />
-            </Panel>
-            <Panel>
-              <DetailPanel
-                entry={controller.selectedEntry}
-                onCreate={controller.handleEntryCreate}
-                subjects={controller.workspace?.subjects ?? []}
-              />
-            </Panel>
-          </Box>
+          <Stack direction={{ lg: "row", xs: "column" }} spacing={2}>
+            <Box sx={{ minWidth: { lg: 320, xs: "auto" }, width: { lg: 360, xs: "100%" } }}>
+              <Panel>
+                <SubjectsPanel
+                  isBusy={controller.isBusy}
+                  onCreate={controller.handleSubjectCreate}
+                  selectedSubjectId={controller.selectedSubjectId}
+                  setSelectedSubjectId={controller.setSelectedSubjectId}
+                  subjects={controller.workspace?.subjects ?? []}
+                />
+              </Panel>
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Panel>
+                <EntriesTable
+                  entries={controller.filteredEntries}
+                  kindFilter={controller.kindFilter}
+                  onCreateResearch={() => {
+                    controller.openDrawer("create");
+                  }}
+                  onSelectEntry={(entry) => {
+                    controller.openDrawer("detail", entry);
+                  }}
+                  search={controller.search}
+                  selectedEntryId={controller.selectedEntry?.id ?? null}
+                  selectedSubjectId={controller.selectedSubjectId}
+                  setKindFilter={controller.setKindFilter}
+                  setSearch={controller.setSearch}
+                />
+              </Panel>
+            </Box>
+          </Stack>
+          <KnowledgeDrawer
+            entry={controller.drawerEntry}
+            isOpen={controller.drawerMode !== null}
+            mode={controller.drawerMode}
+            onClose={controller.closeDrawer}
+            onCreateEntry={controller.handleEntryCreate}
+            onModeChange={controller.setDrawerMode}
+            subjects={controller.workspace?.subjects ?? []}
+          />
         </Stack>
       </Container>
-    </Box>
+    </Shell>
   );
 }
 
@@ -84,28 +105,37 @@ function useKnowledgeWorkspaceController() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("all");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<KnowledgeWorkspace | null>(null);
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  const [drawerEntryId, setDrawerEntryId] = useState<string | null>(null);
+
   const deferredSearch = useDeferredValue(search);
-  const filteredEntries = filterEntries(workspace?.entries ?? [], selectedSubjectId, kindFilter, deferredSearch);
-  const selectedEntry = filteredEntries.find((entry) => entry.id === selectedEntryId) ?? filteredEntries[0] ?? null;
+  const filteredEntries = useMemo(() => filterEntries(workspace?.entries ?? [], selectedSubjectId, kindFilter, deferredSearch), [
+    deferredSearch,
+    kindFilter,
+    selectedSubjectId,
+    workspace?.entries
+  ]);
+  const selectedEntry = filteredEntries.find((entry) => entry.id === selectedEntryId) ?? null;
+  const drawerEntry = workspace?.entries.find((entry) => entry.id === drawerEntryId) ?? null;
 
   useEffect(() => {
     void refreshWorkspace(setErrorMessage, setIsBusy, setWorkspace);
   }, []);
 
-  useEffect(() => {
-    setSelectedEntryId(selectedEntry?.id ?? null);
-  }, [selectedEntry?.id]);
-
-  const refresh = async () => refreshWorkspace(setErrorMessage, setIsBusy, setWorkspace);
-
   return {
+    closeDrawer: () => {
+      setDrawerMode(null);
+      setDrawerEntryId(null);
+    },
+    drawerEntry,
+    drawerMode,
     errorMessage,
     filteredEntries,
     handleEntryCreate: async (input: CreateKnowledgeEntryDraftInput) =>
       runKnowledgeMutation({
         action: async () => createKnowledgeEntry(input),
         errorMessage: "Failed to save the knowledge entry.",
-        refresh,
+        refresh: async () => refreshWorkspace(setErrorMessage, setIsBusy, setWorkspace),
         setErrorMessage,
         setSuccessMessage,
         successMessage: "Knowledge entry saved."
@@ -114,7 +144,7 @@ function useKnowledgeWorkspaceController() {
       runKnowledgeMutation({
         action: async () => syncRepositoryDocs(),
         errorMessage: "Failed to synchronize repository docs.",
-        refresh,
+        refresh: async () => refreshWorkspace(setErrorMessage, setIsBusy, setWorkspace),
         setErrorMessage,
         setSuccessMessage,
         successMessage: "Repository docs synchronized into knowledge."
@@ -123,16 +153,24 @@ function useKnowledgeWorkspaceController() {
       runKnowledgeMutation({
         action: async () => createKnowledgeSubject(input),
         errorMessage: "Failed to save the subject.",
-        refresh,
+        refresh: async () => refreshWorkspace(setErrorMessage, setIsBusy, setWorkspace),
         setErrorMessage,
         setSuccessMessage,
         successMessage: "Knowledge subject saved."
       }),
     isBusy,
     kindFilter,
+    openDrawer: (mode: Exclude<DrawerMode, null>, entry?: KnowledgeEntry) => {
+      setDrawerMode(mode);
+      setDrawerEntryId(entry?.id ?? null);
+      if (entry !== undefined) {
+        setSelectedEntryId(entry.id);
+      }
+    },
     search,
     selectedEntry,
     selectedSubjectId,
+    setDrawerMode,
     setKindFilter,
     setSearch,
     setSelectedEntryId,
@@ -142,7 +180,17 @@ function useKnowledgeWorkspaceController() {
   };
 }
 
-function Header({ onRepoSync }: { readonly onRepoSync: () => Promise<void> }) {
+function Header({
+  colorMode,
+  onColorModeChange,
+  onCreateResearch,
+  onRepoSync
+}: {
+  readonly colorMode: "dark" | "light";
+  readonly onColorModeChange: (value: "dark" | "light") => void;
+  readonly onCreateResearch: () => void;
+  readonly onRepoSync: () => Promise<void>;
+}) {
   return (
     <Stack direction={{ lg: "row", xs: "column" }} justifyContent="space-between" spacing={2}>
       <div>
@@ -151,15 +199,46 @@ function Header({ onRepoSync }: { readonly onRepoSync: () => Promise<void> }) {
           Long-term memory for agents and humans: structured profiles, research notes, workflow memory, and repository-doc mirrors in one local database.
         </Typography>
       </div>
-      <Button onClick={() => void onRepoSync()} size="large" variant="contained">
-        Sync Repository Docs
-      </Button>
+      <Stack direction="row" spacing={1}>
+        <Tooltip title={`Switch to ${colorMode === "dark" ? "light" : "dark"} mode`}>
+          <IconButton
+            aria-label="toggle color mode"
+            onClick={() => {
+              onColorModeChange(colorMode === "dark" ? "light" : "dark");
+            }}
+          >
+            {colorMode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
+        <Button onClick={onCreateResearch} variant="outlined">
+          New Research
+        </Button>
+        <Button onClick={() => void onRepoSync()} size="large" variant="contained">
+          Sync Repository Docs
+        </Button>
+      </Stack>
     </Stack>
   );
 }
 
 function Panel({ children }: { readonly children: ReactNode }) {
   return <Paper sx={{ p: 2.5 }}>{children}</Paper>;
+}
+
+function Shell({ children }: { readonly children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        background:
+          "radial-gradient(circle at top left, color-mix(in srgb, var(--mui-palette-secondary-main) 18%, transparent), transparent 28%), radial-gradient(circle at top right, color-mix(in srgb, var(--mui-palette-primary-main) 12%, transparent), transparent 32%), linear-gradient(180deg, var(--mui-palette-background-default) 0%, var(--mui-palette-background-paper) 100%)",
+        minHeight: "100vh",
+        pb: 5,
+        pt: 5
+      }}
+    >
+      {children}
+    </Box>
+  );
 }
 
 async function runKnowledgeMutation(options: {

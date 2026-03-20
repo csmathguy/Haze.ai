@@ -1,9 +1,9 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 
 import { App } from "./app/App.js";
-import { appTheme } from "./theme/index.js";
+import { createKnowledgeTheme } from "./theme/index.js";
 
 const rootElement = document.getElementById("root");
 
@@ -13,9 +13,23 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <ThemeProvider theme={appTheme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
+    <KnowledgeRoot />
   </StrictMode>
 );
+
+function KnowledgeRoot() {
+  const [mode, setMode] = useState<"light" | "dark">(() => {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.dataset.muiColorScheme = mode;
+  }, [mode]);
+
+  return (
+    <ThemeProvider theme={createKnowledgeTheme(mode)}>
+      <CssBaseline />
+      <App colorMode={mode} onColorModeChange={setMode} />
+    </ThemeProvider>
+  );
+}
