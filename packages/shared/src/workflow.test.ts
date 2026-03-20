@@ -433,7 +433,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const parallelStep = parallelDefinition.steps[0] as any;
       const result = engine.executeParallelStep(run, parallelStep);
 
-      const parallelState = result.nextRun.contextJson.parallel_1 as Record<string, unknown>;
+      const parallelState = result.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
       expect(parallelState).toBeDefined();
       expect(parallelState.totalBranches).toBe(2);
       expect(parallelState.completedBranches).toBe(0);
@@ -447,7 +447,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const parallelStep = parallelDefinition.steps[0] as any;
       const result = engine.executeParallelStep(run, parallelStep);
 
-      const parallelState = result.nextRun.contextJson.parallel_1 as Record<string, unknown>;
+      const parallelState = result.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
       const branchStates = parallelState.branchStates as Record<string, Record<string, unknown>>;
 
       expect(branchStates.branch_0).toBeDefined();
@@ -511,7 +511,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       };
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, branchResult);
 
-      const parallelState = completeResult.nextRun.contextJson.parallel_1 as Record<string, unknown>;
+      const parallelState = completeResult.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
       const branchStates = parallelState.branchStates as Record<string, Record<string, unknown>>;
       expect(branchStates.branch_0?.status).toBe("success");
     });
@@ -530,7 +530,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       };
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, branchResult);
 
-      const parallelState = completeResult.nextRun.contextJson.parallel_1 as Record<string, unknown>;
+      const parallelState = completeResult.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
       expect(parallelState.completedBranches).toBe(1);
     });
 
@@ -549,7 +549,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       };
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, branchResult);
 
-      expect(completeResult.nextRun.contextJson.branch_parallel_1_0_output).toEqual(branchOutput);
+      expect(completeResult.nextRun.contextJson["branch_parallel-1_0_output"]).toEqual(branchOutput);
     });
 
     it("completes parallel step when all branches succeed", () => {
@@ -613,7 +613,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       };
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 1, failureResult);
 
-      const parallelState = completeResult.nextRun.contextJson.parallel_1 as Record<string, unknown>;
+      const parallelState = completeResult.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
       const branchStates = parallelState.branchStates as Record<string, Record<string, unknown>>;
       expect(branchStates.branch_1?.status).toBe("failure");
       expect(branchStates.branch_1?.error).toEqual({ message: "Something went wrong" });
@@ -633,7 +633,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       };
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, failureResult);
 
-      const parallelState = completeResult.nextRun.contextJson.parallel_1 as Record<string, unknown>;
+      const parallelState = completeResult.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
       expect(parallelState.failedBranch).toBeDefined();
       const failedBranch = parallelState.failedBranch as Record<string, unknown>;
       expect(failedBranch.index).toBe(0);
