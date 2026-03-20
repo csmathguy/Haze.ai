@@ -46,8 +46,7 @@ export async function executeWithRetry<T>(
       return {
         value,
         attempts: attempt,
-        totalDurationMs,
-        lastError: undefined
+        totalDurationMs
       };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -83,8 +82,7 @@ export function createRetryPolicy(
   // Convert maxRetries to maxAttempts: maxRetries=2 means 1 initial + 2 retries = 3 attempts
   const maxAttempts = (policy.maxRetries ?? 0) + 1;
 
-  return {
-    maxAttempts,
-    delayMs: policy.backoffMs
-  };
+  return policy.backoffMs !== undefined
+    ? { maxAttempts, delayMs: policy.backoffMs }
+    : { maxAttempts };
 }
