@@ -14,12 +14,14 @@ export const GATEWAY_CORS_ORIGINS = [
   "http://localhost:5175", // plan/web
   "http://localhost:5177", // knowledge/web
   "http://localhost:5178", // code-review/web
+  "http://localhost:5179", // workflow/web
   `http://${GATEWAY_HOST}:5100`,
   `http://${GATEWAY_HOST}:5173`,
   `http://${GATEWAY_HOST}:5174`,
   `http://${GATEWAY_HOST}:5175`,
   `http://${GATEWAY_HOST}:5177`,
-  `http://${GATEWAY_HOST}:5178`
+  `http://${GATEWAY_HOST}:5178`,
+  `http://${GATEWAY_HOST}:5179`
 ];
 
 export const TAXES_DATABASE_URL =
