@@ -17,10 +17,12 @@ import {
   TAXES_DATABASE_URL,
   WORKFLOW_DATABASE_URL
 } from "./config.js";
+import { registerWebhooksRoutes } from "./routes/webhooks.js";
 
 export interface GatewayOptions {
   readonly auditDatabaseUrl?: string;
   readonly codeReviewService?: CodeReviewService;
+  readonly githubWebhookSecret?: string;
   readonly knowledgeDatabaseUrl?: string;
   readonly knowledgeDocsRoot?: string;
   readonly planningDatabaseUrl?: string;
@@ -43,6 +45,10 @@ export async function buildGatewayApp(options: GatewayOptions = {}) {
   // Single health endpoint covers all domains.
   app.get("/api/health", () => ({ localOnly: true, service: "gateway", status: "ok" }));
 
+  registerWebhooksRoutes(app, {
+    databaseUrl: workflowDb,
+    ...(options.githubWebhookSecret ? { githubWebhookSecret: options.githubWebhookSecret } : {})
+  });
   await app.register(registerTaxesPlugin, { databaseUrl: taxesDb });
   await app.register(registerAuditPlugin, { databaseUrl: auditDb });
   await app.register(registerPlanPlugin, { databaseUrl: planningDb });
