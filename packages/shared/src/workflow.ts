@@ -224,11 +224,7 @@ export class WorkflowEngine {
         const firstStepInBranch = branch[0];
         effects.push({
           type: "execute-step",
-          step: {
-            ...firstStepInBranch,
-            // Store branch index for tracking (this is metadata, not part of the step itself)
-            // We'll use a wrapper or context key instead
-          }
+          step: firstStepInBranch
         });
       }
     }
