@@ -5,7 +5,7 @@ export interface WorkflowWebDevServerConfig {
 
 const DEFAULT_API_HOST = "127.0.0.1";
 const DEFAULT_API_PORT = 3040;
-const DEFAULT_WEB_PORT = 5174;
+const DEFAULT_WEB_PORT = 5179;
 
 export function resolveWorkflowWebDevServerConfig(environment: NodeJS.ProcessEnv = process.env): WorkflowWebDevServerConfig {
   const apiHost = environment.WORKFLOW_API_HOST ?? DEFAULT_API_HOST;
