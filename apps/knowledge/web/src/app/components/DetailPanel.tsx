@@ -3,6 +3,7 @@ import { Button, Chip, MenuItem, Paper, Stack, TextField, Typography } from "@mu
 import type { CreateKnowledgeEntryDraftInput, KnowledgeEntry, KnowledgeSubject } from "@taxes/shared";
 
 import { buildEntryInput } from "../model.js";
+import { KnowledgeMarkdown } from "./KnowledgeMarkdown.js";
 
 const detailKinds = ["agent-memory", "research-report", "technical-note", "profile-note", "follow-up", "process-note"] as const;
 const visibilities = ["shared", "agent", "human"] as const;
@@ -143,9 +144,7 @@ function EntryDetail({ entry }: { readonly entry: KnowledgeEntry }) {
         </Stack>
       )}
       {entry.content.markdown === undefined ? null : (
-        <Typography sx={{ whiteSpace: "pre-wrap" }} variant="body2">
-          {entry.content.markdown}
-        </Typography>
+        <KnowledgeMarkdown content={entry.content.markdown} />
       )}
       {entry.content.json === undefined ? null : (
         <Paper sx={{ p: 1.5 }}>
