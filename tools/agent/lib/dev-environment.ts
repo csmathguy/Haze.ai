@@ -1,17 +1,19 @@
 export type DevCheckoutMode = "main";
-export type DevEnvironmentId = "all" | "audit" | "code-review" | "knowledge" | "plan" | "taxes";
+export type DevEnvironmentId = "all" | "audit" | "code-review" | "gateway" | "knowledge" | "plan" | "taxes" | "workflow";
 export type DevProductId = Exclude<DevEnvironmentId, "all">;
 export type DevServiceId =
   | "audit-api"
   | "audit-web"
   | "code-review-api"
   | "code-review-web"
+  | "gateway-api"
   | "knowledge-api"
   | "knowledge-web"
   | "plan-api"
   | "plan-web"
   | "taxes-api"
-  | "taxes-web";
+  | "taxes-web"
+  | "workflow-web";
 export type DevServiceKind = "api" | "web";
 
 export interface ParsedDevEnvironmentArgs {
@@ -133,6 +135,23 @@ const SERVICE_DEFINITIONS: readonly DevServiceDefinition[] = [
     label: "Code Review Web",
     primaryUrl: "http://127.0.0.1:5178",
     workspace: "@taxes/code-review-web"
+  },
+  {
+    appId: "gateway",
+    healthUrl: "http://127.0.0.1:3000/api/health",
+    id: "gateway-api",
+    kind: "api",
+    label: "Gateway API",
+    primaryUrl: "http://127.0.0.1:3000",
+    workspace: "@taxes/gateway-api"
+  },
+  {
+    appId: "workflow",
+    id: "workflow-web",
+    kind: "web",
+    label: "Workflow Web",
+    primaryUrl: "http://127.0.0.1:5179",
+    workspace: "@taxes/workflow-web"
   }
 ] as const;
 
@@ -166,6 +185,18 @@ const ENVIRONMENT_DEFINITIONS: readonly DevEnvironmentDefinition[] = [
     id: "code-review",
     label: "Code Review",
     serviceIds: ["code-review-api", "code-review-web"]
+  },
+  {
+    description: "Gateway API that aggregates product routes and shared endpoints.",
+    id: "gateway",
+    label: "Gateway",
+    serviceIds: ["gateway-api"]
+  },
+  {
+    description: "Workflow graph UI for monitoring and interacting with workflow runs.",
+    id: "workflow",
+    label: "Workflow",
+    serviceIds: ["workflow-web"]
   }
 ] as const;
 
