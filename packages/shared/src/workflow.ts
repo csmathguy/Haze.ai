@@ -5,8 +5,7 @@ import type {
   WorkflowEffect,
   StepResult,
   WorkflowEvent,
-  ParallelStep,
-  WorkflowStep
+  ParallelStep
 } from "./workflow-schemas.js";
 
 /**
@@ -203,9 +202,9 @@ export class WorkflowEngine {
 
     // Initialize branch tracking in context
     const branchStates: Record<string, { status: "running" | "success" | "failure"; error?: { message: string; code?: string } }> = {};
-    for (let i = 0; i < parallelStep.branches.length; i++) {
-      branchStates[`branch_${i}`] = { status: "running" };
-    }
+    parallelStep.branches.forEach((_branch, i) => {
+      branchStates[`branch_${String(i)}`] = { status: "running" };
+    });
 
     nextRun.contextJson = {
       ...nextRun.contextJson,
@@ -218,10 +217,9 @@ export class WorkflowEngine {
     };
 
     // Generate execute-step effects for the first step of each branch
-    for (let i = 0; i < parallelStep.branches.length; i++) {
-      const branch = parallelStep.branches[i];
-      if (branch && branch.length > 0) {
-        const firstStepInBranch = branch[0];
+    for (const branch of parallelStep.branches) {
+      const firstStepInBranch = branch[0];
+      if (firstStepInBranch !== undefined) {
         effects.push({
           type: "execute-step",
           step: firstStepInBranch
@@ -250,9 +248,9 @@ export class WorkflowEngine {
     const effects: WorkflowEffect[] = [];
 
     const parallelStepKey = this.getParallelStepKey(parallelStepId);
-    const parallelState = nextRun.contextJson[parallelStepKey] as Record<string, unknown>;
+    const rawParallelState: unknown = nextRun.contextJson[parallelStepKey];
 
-    if (!parallelState) {
+    if (rawParallelState === undefined || rawParallelState === null) {
       // Parallel step not found in context - this shouldn't happen
       nextRun.status = "failed";
       nextRun.completedAt = now;
@@ -266,8 +264,9 @@ export class WorkflowEngine {
       return { nextRun, effects };
     }
 
+    const parallelState = rawParallelState as Record<string, unknown>;
     const branchStates = parallelState.branchStates as Record<string, Record<string, unknown>>;
-    const branchKey = `branch_${branchIndex}`;
+    const branchKey = `branch_${String(branchIndex)}`;
     const totalBranches = parallelState.totalBranches as number;
 
     if (result.type === "failure") {
@@ -289,7 +288,7 @@ export class WorkflowEngine {
       effects.push({
         type: "fail-run",
         error: {
-          message: `Branch ${branchIndex} failed: ${result.error.message}`,
+          message: `Branch ${String(branchIndex)} failed: ${result.error.message}`,
           code: result.error.code ?? "BRANCH_FAILED"
         }
       });
@@ -352,6 +351,6 @@ export class WorkflowEngine {
    * Get the key for storing branch output in context.
    */
   private getBranchOutputKey(parallelStepId: string, branchIndex: number): string {
-    return `branch_${parallelStepId}_${branchIndex}_output`;
+    return `branch_${parallelStepId}_${String(branchIndex)}_output`;
   }
 }

@@ -6,6 +6,7 @@ import {
 import type {
   WorkflowDefinition,
   CommandStep,
+  ParallelStep,
   StepResult
 } from "./workflow-schemas.js";
 
@@ -53,7 +54,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
       const run = startResult.nextRun;
 
-      const parallelStep = parallelDefinition.steps[0] as any;
+      const parallelStep = parallelDefinition.steps[0] as ParallelStep;
       const result = engine.executeParallelStep(run, parallelStep);
 
       expect(result.effects).toHaveLength(2);
@@ -65,7 +66,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
       const run = startResult.nextRun;
 
-      const parallelStep = parallelDefinition.steps[0] as any;
+      const parallelStep = parallelDefinition.steps[0] as ParallelStep;
       const result = engine.executeParallelStep(run, parallelStep);
 
       const parallelState = result.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
@@ -79,7 +80,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
       const run = startResult.nextRun;
 
-      const parallelStep = parallelDefinition.steps[0] as any;
+      const parallelStep = parallelDefinition.steps[0] as ParallelStep;
       const result = engine.executeParallelStep(run, parallelStep);
 
       const parallelState = result.nextRun.contextJson["parallel_parallel-1"] as Record<string, unknown>;
@@ -110,7 +111,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(emptyParallelDef, {});
       const run = startResult.nextRun;
 
-      const parallelStep = emptyParallelDef.steps[0] as any;
+      const parallelStep = emptyParallelDef.steps[0] as ParallelStep;
       const result = engine.executeParallelStep(run, parallelStep);
 
       expect(result.nextRun.status).toBe("completed");
@@ -123,7 +124,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
       const run = startResult.nextRun;
 
-      const parallelStep = parallelDefinition.steps[0] as any;
+      const parallelStep = parallelDefinition.steps[0] as ParallelStep;
       const result = engine.executeParallelStep(run, parallelStep);
 
       expect(result.nextRun.status).toBe("running");
@@ -136,7 +137,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
       let run = startResult.nextRun;
 
-      const parallelStep = parallelDefinition.steps[0] as any;
+      const parallelStep = parallelDefinition.steps[0] as ParallelStep;
       run = engine.executeParallelStep(run, parallelStep).nextRun;
 
       const branchResult: StepResult = { type: "success", output: { result: "branch1_done" } };
@@ -151,7 +152,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
       let run = startResult.nextRun;
 
-      run = engine.executeParallelStep(run, parallelDefinition.steps[0] as any).nextRun;
+      run = engine.executeParallelStep(run, parallelDefinition.steps[0] as ParallelStep).nextRun;
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, {
         type: "success", output: { result: "branch1_done" }
       });
@@ -164,7 +165,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
       let run = startResult.nextRun;
 
-      run = engine.executeParallelStep(run, parallelDefinition.steps[0] as any).nextRun;
+      run = engine.executeParallelStep(run, parallelDefinition.steps[0] as ParallelStep).nextRun;
       const branchOutput = { result: "branch1_output", value: 42 };
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, {
         type: "success", output: branchOutput
@@ -175,7 +176,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
 
     it("completes parallel step when all branches succeed", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
-      let run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as any).nextRun;
+      let run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as ParallelStep).nextRun;
 
       run = engine.completeBranchInParallelStep(run, "parallel-1", 0, {
         type: "success", output: { result: "branch0_done" }
@@ -191,7 +192,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
 
     it("fails parallel step when any branch fails", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
-      let run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as any).nextRun;
+      const run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as ParallelStep).nextRun;
 
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, {
         type: "failure", error: { message: "Branch 0 failed", code: "BRANCH_ERROR" }
@@ -203,7 +204,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
 
     it("marks branch as failed when branch fails", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
-      let run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as any).nextRun;
+      const run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as ParallelStep).nextRun;
 
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 1, {
         type: "failure", error: { message: "Something went wrong" }
@@ -217,7 +218,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
 
     it("records failed branch information", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
-      let run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as any).nextRun;
+      const run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as ParallelStep).nextRun;
 
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 0, {
         type: "failure", error: { message: "Branch failed", code: "TEST_ERROR" }
@@ -232,7 +233,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
 
     it("keeps parallel step in running state until all branches complete", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
-      let run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as any).nextRun;
+      const run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as ParallelStep).nextRun;
 
       const result = engine.completeBranchInParallelStep(run, "parallel-1", 0, {
         type: "success", output: { result: "branch0_done" }
@@ -244,7 +245,7 @@ describe("WorkflowEngine - ParallelStep Execution", () => {
 
     it("includes error message with branch index on failure", () => {
       const startResult = engine.startRun(parallelDefinition, { data: "test" });
-      let run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as any).nextRun;
+      const run = engine.executeParallelStep(startResult.nextRun, parallelDefinition.steps[0] as ParallelStep).nextRun;
 
       const completeResult = engine.completeBranchInParallelStep(run, "parallel-1", 1, {
         type: "failure", error: { message: "Custom error" }
