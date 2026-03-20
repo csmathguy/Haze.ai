@@ -38,12 +38,42 @@
    - Frontend styling changes: `npm run stylelint`
    - Full tests with `npm test` or architecture-only tests with `npm run test:arch`
    - Use `npm run quality:logged -- implementation` when you want a single audited full guardrail run
-14. When the task produces branch-ready changes, make atomic commits, push the branch, and create or update the pull request before claiming the work is done. Use `node tools/runtime/run-npm.cjs run pr:sync -- --summary "<what changed>" --value "<why it matters>" --privacy-confirmed`.
+14. When the task produces branch-ready changes, make atomic commits, push the branch, and create or update the pull request before claiming the work is done. Use `node tools/runtime/run-npm.cjs run pr:sync -- --summary "<what changed>" --value "<why it matters>" --privacy-confirmed [--work-item-id <PLAN-XXX>]`. The optional `--work-item-id` flag auto-closes the linked work item via the planning CLI after a successful push.
 15. Agents must not merge pull requests. PR merge is a human-controlled action that happens after review, and this repository will later route that decision through the `code-review` project workflow.
 16. Close audited work with `npm run workflow:end implementation success` or `failed`. Successful implementation workflows are not done until the worktree is clean and the branch has an open PR when commits exist.
 17. If a command is not available yet, note the gap and update the nearest documentation or scaffold so the repo moves toward that standard.
 
-## Architecture Rules
+## Context Management
+
+Long-running agent sessions accumulate context and can burn tokens unnecessarily. Use mandatory
+`/compact` checkpoints to prune accumulated information while preserving critical task state.
+
+**Three mandatory `/compact` checkpoints:**
+
+1. **After each merged PR** — Once a branch is merged or a PR is closed, compact to drop the diff context:
+   ```
+   /compact preserve: active workflow ID, current work-item ID, list of completed work items
+   ```
+
+2. **After each major investigation or diagnosis** — After exploring filesystem, reading docs, or debugging:
+   ```
+   /compact preserve: findings summary, decision made, active workflow ID, active work-item ID
+   ```
+
+3. **Before starting a new work item** — When moving from one task to another:
+   ```
+   /compact preserve: previous work-item ID, PR number if created, active workflow ID
+   ```
+
+**Preservation list template** — Always include these when using `/compact`:
+- **Modified files list** — the exact file paths changed in this session (use `git status` output)
+- **Test or validation commands run** — the npm commands and their results (pass/fail)
+- **Active workflow ID** — from `.agent-session.json` (format: `2026-03-19T...-implementation-...`)
+- **Current work-item ID** — the PLAN-XXX being actively worked on
+- **Branch and PR info** — the current branch name and PR URL if applicable
+
+These four elements are load-bearing for resuming interrupted work. Everything else—file contents,
+commit history, exploration paths—can be reconstructed from git and the codebase.
 - Keep a strict separation between app surfaces under `apps/*/web`, `apps/*/api`, and `packages/shared`.
 - Keep a strict separation between web and api layers, including nested app domains such as `apps/audit/web` and `apps/audit/api`.
 - `packages/shared` must stay framework-light and hold reusable domain types, schemas, and pure helpers.
