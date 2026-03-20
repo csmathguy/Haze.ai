@@ -47,9 +47,10 @@ export async function getDefinitionByName(
       name,
       status: "active"
     },
-    orderBy: {
-      createdAt: "desc"
-    },
+    orderBy: [
+      { createdAt: "desc" },
+      { id: "desc" }
+    ],
     take: 1
   });
 
