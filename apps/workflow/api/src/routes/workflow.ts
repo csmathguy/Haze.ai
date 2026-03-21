@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getWorkflowPrismaClient } from "../db/client.js";
 import * as agentService from "../services/agent-service.js";
+import * as analyticsService from "../services/analytics-service.js";
 import * as approvalService from "../services/approval-service.js";
 import * as skillService from "../services/skill-service.js";
 import * as workflowDefinitionService from "../services/workflow-definition-service.js";
@@ -132,6 +133,89 @@ function registerRunListAndCreateRoutes(app: FastifyInstance, databaseUrl?: stri
       if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid query parameters", details: error.issues }; }
       throw error;
     }
+  });
+
+  app.get("/api/workflow/runs/summary", async (request: FastifyRequest, reply: FastifyReply) => {
+    const prisma = await getWorkflowPrismaClient(databaseUrl);
+    try {
+      const now = new Date();
+      const stalledThresholdMs = 5 * 60 * 1000; // 5 minutes
+
+      // Get all active runs (not completed/failed)
+      const activeRuns = await prisma.workflowRun.findMany({
+        where: {
+          status: {
+            in: ["pending", "running", "waiting"]
+          }
+        },
+        include: {
+          workflowStepRuns: {
+            orderBy: { startedAt: "desc" },
+            take: 1
+          }
+        },
+        orderBy: { startedAt: "desc" },
+        take: 100
+      });
+
+      // Get recent completed/failed runs (last 10)
+      const recentRuns = await prisma.workflowRun.findMany({
+        where: {
+          status: {
+            in: ["completed", "failed", "cancelled"]
+          }
+        },
+        include: {
+          workflowStepRuns: {
+            orderBy: { startedAt: "desc" },
+            take: 1
+          }
+        },
+        orderBy: { completedAt: "desc" },
+        take: 10
+      });
+
+      // Get all pending approvals
+      const pendingApprovals = await prisma.workflowApproval.findMany({
+        where: { status: "pending" }
+      });
+
+      // Count runs by status
+      const counts = await Promise.all([
+        prisma.workflowRun.count({ where: { status: "running" } }),
+        prisma.workflowRun.count({ where: { status: "waiting" } }),
+        prisma.workflowRun.count({ where: { status: "failed" } }),
+        prisma.workflowRun.count({ where: { status: "completed" } })
+      ]);
+
+      const formatRun = (run: typeof activeRuns[0]) => {
+        const lastStepRun = run.workflowStepRuns[0];
+        const isStalled = run.status === "waiting" && (now.getTime() - new Date(run.updatedAt).getTime()) > stalledThresholdMs;
+        const pendingApproval = pendingApprovals.find(a => a.runId === run.id);
+
+        return {
+          id: run.id,
+          definitionName: run.definitionName,
+          status: run.status,
+          currentStep: run.currentStep ?? lastStepRun?.stepId ?? null,
+          startedAt: run.startedAt.toISOString(),
+          elapsedMs: now.getTime() - new Date(run.startedAt).getTime(),
+          isStalled,
+          pendingApprovalId: pendingApproval?.id ?? null
+        };
+      };
+
+      return {
+        counts: {
+          running: counts[0],
+          waiting: counts[1],
+          failed: counts[2],
+          completed: counts[3]
+        },
+        activeRuns: activeRuns.map(formatRun),
+        recentRuns: recentRuns.map(formatRun)
+      };
+    } finally { await prisma.$disconnect(); }
   });
 }
 
@@ -343,6 +427,30 @@ function registerApprovalRoutes(app: FastifyInstance, databaseUrl?: string): voi
   });
 }
 
+function registerAnalyticsRoutes(app: FastifyInstance, databaseUrl?: string): void {
+  app.get("/api/workflow/analytics", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const params = z.object({
+        definitionName: z.string().optional(),
+        since: z.string().datetime().optional()
+      }).parse(request.query);
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
+      try {
+        const since = params.since ? new Date(params.since) : undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const analytics = await analyticsService.getWorkflowAnalytics(prisma, {
+          ...(params.definitionName !== undefined ? { definitionName: params.definitionName } : {}),
+          ...(since !== undefined ? { since } : {})
+        } as any);
+        return { analytics };
+      } finally { await prisma.$disconnect(); }
+    } catch (error) {
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid query parameters", details: error.issues }; }
+      throw error;
+    }
+  });
+}
+
 export function registerWorkflowRoutes(app: FastifyInstance, options?: { databaseUrl?: string | undefined }): void {
   const db = options?.databaseUrl;
   registerDefinitionRoutes(app, db);
@@ -351,4 +459,5 @@ export function registerWorkflowRoutes(app: FastifyInstance, options?: { databas
   registerAgentRoutes(app, db);
   registerSkillRoutes(app, db);
   registerApprovalRoutes(app, db);
+  registerAnalyticsRoutes(app, db);
 }

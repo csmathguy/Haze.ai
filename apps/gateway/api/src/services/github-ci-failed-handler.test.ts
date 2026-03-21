@@ -149,7 +149,7 @@ describe("GitHubCiFailedHandler", () => {
 
     expect(mockCreateEvent).toHaveBeenCalled();
     const callArgs = mockCreateEvent.mock.calls[0]?.[0] as { data: { payload: string } };
-    const eventPayload = JSON.parse(callArgs.data.payload);
+    const eventPayload = JSON.parse(callArgs.data.payload) as Record<string, unknown>;
     expect(eventPayload.workItemId).toBe("PLAN-100");
   });
 

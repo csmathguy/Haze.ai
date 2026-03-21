@@ -5,6 +5,13 @@ import { z } from "zod";
 
 import { getWorkflowPrismaClient } from "../db/client.js";
 import { GitHubCiFailedHandler } from "../services/github-ci-failed-handler.js";
+import {
+  GitHubPullRequestPayloadSchema,
+  GitHubPushPayloadSchema,
+  GitHubWorkflowRunPayloadSchema,
+  GitHubCheckSuitePayloadSchema,
+  GitHubCheckRunPayloadSchema
+} from "./webhook-payload-schemas.js";
 
 declare global {
   interface FastifyRequest {
@@ -16,119 +23,6 @@ export interface WebhooksRouteOptions {
   readonly databaseUrl?: string;
   readonly githubWebhookSecret?: string;
 }
-
-const GitHubPullRequestPayloadSchema = z.object({
-  action: z.string(),
-  pull_request: z
-    .object({
-      number: z.number(),
-      title: z.string(),
-      body: z.string().optional(),
-      merged: z.boolean().optional()
-    })
-    .optional(),
-  repository: z
-    .object({
-      name: z.string(),
-      owner: z.object({
-        login: z.string()
-      })
-    })
-    .optional()
-});
-
-const GitHubPushPayloadSchema = z.object({
-  ref: z.string(),
-  repository: z
-    .object({
-      name: z.string(),
-      owner: z.object({
-        login: z.string()
-      })
-    })
-    .optional()
-});
-
-const GitHubWorkflowRunPayloadSchema = z.object({
-  action: z.string(),
-  workflow_run: z
-    .object({
-      id: z.number(),
-      name: z.string(),
-      head_branch: z.string().nullable(),
-      head_sha: z.string(),
-      conclusion: z.string().nullable(),
-      status: z.string(),
-      html_url: z.string().optional(),
-      pull_requests: z
-        .array(
-          z.object({
-            number: z.number()
-          })
-        )
-        .optional()
-    })
-    .optional(),
-  repository: z
-    .object({
-      name: z.string(),
-      owner: z.object({
-        login: z.string()
-      })
-    })
-    .optional()
-});
-
-const GitHubCheckSuitePayloadSchema = z.object({
-  action: z.string(),
-  check_suite: z
-    .object({
-      id: z.number(),
-      head_branch: z.string().nullable(),
-      head_sha: z.string(),
-      conclusion: z.string().nullable(),
-      status: z.string()
-    })
-    .optional(),
-  repository: z
-    .object({
-      name: z.string(),
-      owner: z.object({
-        login: z.string()
-      })
-    })
-    .optional()
-});
-
-const GitHubCheckRunPayloadSchema = z.object({
-  action: z.string(),
-  check_run: z
-    .object({
-      id: z.number(),
-      name: z.string(),
-      head_branch: z.string().nullable(),
-      head_sha: z.string(),
-      conclusion: z.string().nullable(),
-      status: z.string(),
-      html_url: z.string().optional(),
-      pull_requests: z
-        .array(
-          z.object({
-            number: z.number()
-          })
-        )
-        .optional()
-    })
-    .optional(),
-  repository: z
-    .object({
-      name: z.string(),
-      owner: z.object({
-        login: z.string()
-      })
-    })
-    .optional()
-});
 
 interface WebhookVerifyResult {
   valid: boolean;
@@ -166,13 +60,35 @@ function buildCiCorrelationId(owner: string, repo: string, sha: string, branch: 
 }
 
 function extractPrNumber(
-  pullRequests: Array<{ number: number }> | undefined
+  pullRequests: { number: number }[] | undefined
 ): number | undefined {
   if (!pullRequests || pullRequests.length === 0) {
     return undefined;
   }
   const firstPr = pullRequests[0];
   return firstPr?.number;
+}
+
+interface CiRunData {
+  conclusion: string | null;
+  status: string;
+  jobName: string;
+  pullRequests: { number: number }[] | undefined;
+  htmlUrl: string | undefined;
+  fallbackLogsId: string;
+  correlationId: string;
+}
+
+/** Returns a github.ci.failed event if conclusion is failure+completed with a linked PR, else null. */
+function buildCiFailedEvent(run: CiRunData): WebhookEventData | null {
+  if (run.conclusion !== "failure" || run.status !== "completed") return null;
+  const prNumber = extractPrNumber(run.pullRequests);
+  if (!prNumber) return null;
+  return {
+    type: "github.ci.failed",
+    correlationId: run.correlationId,
+    ciFailureData: { prNumber, jobName: run.jobName, logsUrl: run.htmlUrl ?? run.fallbackLogsId }
+  };
 }
 
 function verifySignature(secret: string, signature: string | undefined, rawBody: string): WebhookVerifyResult {
@@ -207,6 +123,24 @@ function parsePullRequestEvent(payload: unknown): WebhookEventData {
   }
 
   const { action, pull_request, repository } = parsed.data;
+
+  // Check for merge conflicts (mergeable_state === "dirty" indicates conflict)
+  if (
+    pull_request &&
+    repository &&
+    ["opened", "synchronize", "reopened"].includes(action) &&
+    pull_request.mergeable_state === "dirty"
+  ) {
+    // Extract PLAN-XXX reference from PR body
+    const prBody = pull_request.body ?? "";
+    const planMatch = /PLAN-(\d+)/i.exec(prBody);
+    if (planMatch) {
+      const { login: owner } = repository.owner;
+      const correlationId = `${owner}/${repository.name}#${String(pull_request.number)}`;
+      return { type: "github.pull_request.conflict", correlationId };
+    }
+  }
+
   const type = `github.pull_request.${action}`;
 
   if (pull_request && repository) {
@@ -240,35 +174,22 @@ function parseWorkflowRunEvent(payload: unknown): WebhookEventData {
 
   const { workflow_run, repository } = parsed.data;
   const conclusion = workflow_run?.conclusion ?? "unknown";
-  const type = `github.workflow_run.${conclusion}`;
 
   if (workflow_run && repository) {
     const correlationId = buildCiCorrelationId(
       repository.owner.login, repository.name,
       workflow_run.head_sha, workflow_run.head_branch
     );
-
-    // Check if this is a CI failure that should be emitted as github.ci.failed
-    if (conclusion === "failure" && workflow_run.status === "completed") {
-      const prNumber = extractPrNumber(workflow_run.pull_requests);
-      const logsUrl = workflow_run.html_url ?? `${repository.owner.login}/${repository.name}`;
-      if (prNumber && logsUrl) {
-        return {
-          type: "github.ci.failed",
-          correlationId,
-          ciFailureData: {
-            prNumber,
-            jobName: workflow_run.name,
-            logsUrl
-          }
-        };
-      }
-    }
-
-    return { type, correlationId };
+    const ciEvent = buildCiFailedEvent({
+      conclusion, status: workflow_run.status, jobName: workflow_run.name,
+      pullRequests: workflow_run.pull_requests, htmlUrl: workflow_run.html_url,
+      fallbackLogsId: `${repository.owner.login}/${repository.name}`, correlationId
+    });
+    if (ciEvent) return ciEvent;
+    return { type: `github.workflow_run.${conclusion}`, correlationId };
   }
 
-  return { type };
+  return { type: `github.workflow_run.${conclusion}` };
 }
 
 function parseCheckSuiteEvent(payload: unknown): WebhookEventData {
@@ -300,35 +221,22 @@ function parseCheckRunEvent(payload: unknown): WebhookEventData {
 
   const { check_run, repository } = parsed.data;
   const conclusion = check_run?.conclusion ?? "unknown";
-  const type = `github.check_run.${conclusion}`;
 
   if (check_run && repository) {
     const correlationId = buildCiCorrelationId(
       repository.owner.login, repository.name,
       check_run.head_sha, check_run.head_branch
     );
-
-    // Check if this is a CI failure that should be emitted as github.ci.failed
-    if (conclusion === "failure" && check_run.status === "completed") {
-      const prNumber = extractPrNumber(check_run.pull_requests);
-      const logsUrl = check_run.html_url ?? `${repository.owner.login}/${repository.name}`;
-      if (prNumber && logsUrl) {
-        return {
-          type: "github.ci.failed",
-          correlationId,
-          ciFailureData: {
-            prNumber,
-            jobName: check_run.name,
-            logsUrl
-          }
-        };
-      }
-    }
-
-    return { type, correlationId };
+    const ciEvent = buildCiFailedEvent({
+      conclusion, status: check_run.status, jobName: check_run.name,
+      pullRequests: check_run.pull_requests, htmlUrl: check_run.html_url,
+      fallbackLogsId: `${repository.owner.login}/${repository.name}`, correlationId
+    });
+    if (ciEvent) return ciEvent;
+    return { type: `github.check_run.${conclusion}`, correlationId };
   }
 
-  return { type };
+  return { type: `github.check_run.${conclusion}` };
 }
 
 function parseGitHubEvent(eventType: string, payload: unknown): WebhookEventData {

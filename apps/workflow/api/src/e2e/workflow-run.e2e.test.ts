@@ -9,6 +9,7 @@ import { buildApp } from "../app.js";
 import { applyPendingMigrations } from "../db/migrations.js";
 import * as workflowDefinitionService from "../services/workflow-definition-service.js";
 import { WorkflowWorker } from "../event-bus/workflow-worker.js";
+import { EventBus } from "../event-bus/event-bus.js";
 
 describe("Workflow E2E: smoke test for full execution loop", () => {
   let prisma: PrismaClient;
@@ -280,6 +281,329 @@ describe("Workflow E2E: smoke test for full execution loop", () => {
       if (typeof stepRun.stdout === "string") {
         expect(stepRun.stdout).toContain("hello-world");
       }
+    }
+  });
+
+  it("wait-for-event: pause, emit matching event, and resume", async () => {
+    // 1. Create a workflow with a wait-for-event step followed by another step
+    await workflowDefinitionService.createDefinition(prisma, {
+      name: "wait-for-event-test",
+      version: "1.0",
+      description: "Test wait-for-event step",
+      triggers: ["manual"],
+      definitionJson: {
+        steps: [
+          {
+            type: "wait-for-event",
+            id: "wait-ci",
+            label: "Wait for CI completion",
+            eventType: "ci.build.completed",
+            timeoutMs: 30000
+          },
+          {
+            type: "command",
+            id: "step-after-wait",
+            label: "Echo after wait",
+            scriptPath: process.platform === "win32" ? "cmd" : "/bin/echo",
+            args: process.platform === "win32" ? ["/c", "echo done"] : ["done"]
+          }
+        ]
+      }
+    });
+
+    // 2. Build the app
+    const app = await buildApp({ databaseUrl: testDbUrl });
+
+    try {
+      // 3. Create a workflow run
+      const createRunResponse = await app.inject({
+        method: "POST",
+        url: "/api/workflow/runs",
+        payload: {
+          definitionName: "wait-for-event-test",
+          input: { testId: "wait-test-123" }
+        }
+      });
+
+      expect(createRunResponse.statusCode).toBe(201);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const createRunData = createRunResponse.json();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const runId = String(createRunData.run.id);
+      expect(runId).toBeDefined();
+
+      // 4. Process worker batch to execute the wait-for-event step
+      const worker = new WorkflowWorker({
+        pollIntervalMs: 100,
+        batchSize: 10,
+        db: prisma
+      });
+
+      await worker.processBatch();
+
+      // 5. Check that run is in waiting state
+      const getRunAfterWaitResponse = await app.inject({
+        method: "GET",
+        url: `/api/workflow/runs/${runId}`
+      });
+
+      expect(getRunAfterWaitResponse.statusCode).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const runAfterWait = getRunAfterWaitResponse.json();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect((runAfterWait.run as Record<string, unknown>).status).toBe("waiting");
+
+      // 6. Emit a matching event to resume the run
+      const eventBus = new EventBus(prisma);
+      await eventBus.emit({
+        workflowRunId: runId,
+        eventType: "ci.build.completed",
+        payload: { status: "success", duration: 120 }
+      });
+
+      // 7. Process another batch to handle the event
+      await worker.processBatch();
+
+      // 8. Check that the run has advanced past the wait step
+      const finalRunResponse = await app.inject({
+        method: "GET",
+        url: `/api/workflow/runs/${runId}`
+      });
+
+      expect(finalRunResponse.statusCode).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const finalRunData = finalRunResponse.json();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      expect((finalRunData.run as Record<string, unknown>).status).not.toBe("waiting");
+
+      // 9. Verify that the wait step run was recorded
+      const waitStepRun = await prisma.workflowStepRun.findFirst({
+        where: { runId, stepId: "wait-ci" }
+      });
+
+      expect(waitStepRun).toBeDefined();
+      expect(waitStepRun?.stepType).toBe("wait-for-event");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("wait-for-event: timeout expires and fails the step", async () => {
+    // 1. Create a workflow with a wait-for-event step with short timeout
+    const timeoutDefinition = await workflowDefinitionService.createDefinition(prisma, {
+      name: "wait-for-event-timeout-test",
+      version: "1.0",
+      description: "Test wait-for-event timeout",
+      triggers: ["manual"],
+      definitionJson: {
+        steps: [
+          {
+            type: "wait-for-event",
+            id: "wait-timeout",
+            label: "Wait with short timeout",
+            eventType: "delayed.event",
+            timeoutMs: 100
+          }
+        ]
+      }
+    });
+
+    // 2. Create a workflow run
+    const run = await prisma.workflowRun.create({
+      data: {
+        definitionId: timeoutDefinition.id,
+        definitionName: "wait-for-event-timeout-test",
+        version: "1.0",
+        status: "running",
+        contextJson: JSON.stringify({})
+      }
+    });
+
+    // 3. Set up the worker
+    const worker = new WorkflowWorker({
+      pollIntervalMs: 50,
+      batchSize: 10,
+      db: prisma
+    });
+
+    // 4. Create event to trigger the wait-for-event step execution
+    const eventBus = new EventBus(prisma);
+    await eventBus.emit({
+      workflowRunId: run.id,
+      eventType: "step.execute-requested",
+      payload: {
+        step: {
+          type: "wait-for-event",
+          id: "wait-timeout",
+          label: "Wait with short timeout",
+          eventType: "delayed.event",
+          timeoutMs: 100
+        }
+      }
+    });
+
+    // 5. Process first batch to create the waiting state
+    await worker.processBatch();
+
+    // Verify the run is waiting
+    const runStateAfterWait = await prisma.workflowRun.findUnique({
+      where: { id: run.id }
+    });
+    expect(runStateAfterWait?.status).toBe("waiting");
+
+    // 6. Wait for timeout to expire
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // 7. Process another batch - should detect timeout
+    await worker.processBatch();
+
+    // 8. Verify the run failed due to timeout
+    const failedRun = await prisma.workflowRun.findUnique({
+      where: { id: run.id }
+    });
+
+    expect(failedRun?.status).toBe("failed");
+
+    // 9. Verify the step run has an error
+    const failedStepRun = await prisma.workflowStepRun.findFirst({
+      where: { runId: run.id, stepId: "wait-timeout" }
+    });
+
+    expect(failedStepRun).toBeDefined();
+    expect(failedStepRun?.errorJson).toBeDefined();
+    if (failedStepRun?.errorJson) {
+      const errorData = JSON.parse(failedStepRun.errorJson) as Record<string, unknown>;
+      expect(errorData.code).toBe("TIMEOUT");
+      expect(String(errorData.message)).toContain("Timeout");
+    }
+  });
+
+  it("executes child-workflow step and merges child output into parent context", async () => {
+    // 1. Create child workflow definition
+    const childDef = await workflowDefinitionService.createDefinition(prisma, {
+      name: `child-workflow-test-${String(Date.now())}`,
+      version: "1.0",
+      description: "Child workflow for testing",
+      triggers: ["manual"],
+      definitionJson: {
+        steps: [
+          {
+            type: "command",
+            id: "child-step-1",
+            label: "Child command",
+            scriptPath: process.platform === "win32" ? "cmd" : "/bin/echo",
+            args: process.platform === "win32" ? ["/c", "echo child-output"] : ["child-output"]
+          }
+        ]
+      }
+    });
+
+    // 2. Create parent workflow definition with child-workflow step
+    const parentDef = await workflowDefinitionService.createDefinition(prisma, {
+      name: `parent-workflow-test-${String(Date.now())}`,
+      version: "1.0",
+      description: "Parent workflow for testing",
+      triggers: ["manual"],
+      definitionJson: {
+        steps: [
+          {
+            type: "child-workflow",
+            id: "child-step",
+            label: "Spawn child workflow",
+            workflowName: childDef.name,
+            inputMapping: {
+              sourceData: "{{contextValue}}"
+            }
+          }
+        ]
+      }
+    });
+
+    const app = await buildApp({ databaseUrl: testDbUrl });
+
+    try {
+      // 3. Create parent run
+      const createRunResponse = await app.inject({
+        method: "POST",
+        url: "/api/workflow/runs",
+        payload: {
+          definitionName: parentDef.name,
+          input: { contextValue: "test-input" }
+        }
+      });
+
+      expect(createRunResponse.statusCode).toBe(201);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const parentRunId = String(createRunResponse.json().run.id);
+      expect(parentRunId).toBeDefined();
+
+      // 4. Process worker batch to execute child-workflow step
+      const worker = new WorkflowWorker({
+        pollIntervalMs: 100,
+        batchSize: 10,
+        db: prisma
+      });
+
+      const batch1 = await worker.processBatch();
+      expect(batch1).toBeGreaterThanOrEqual(0);
+
+      // 5. Check parent is now in waiting status
+      const getParentResponse = await app.inject({
+        method: "GET",
+        url: `/api/workflow/runs/${parentRunId}`
+      });
+
+      expect(getParentResponse.statusCode).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const parentRunData = getParentResponse.json().run;
+      expect((parentRunData as Record<string, unknown>).status).toBe("waiting");
+
+      // 6. Find the child run created
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const childRuns = await prisma.workflowRun.findMany({
+        where: { parentRunId }
+      });
+
+      expect(childRuns.length).toBeGreaterThan(0);
+      const childRunId = childRuns[0]?.id;
+      expect(childRunId).toBeDefined();
+
+      // 7. Process worker batch to execute child steps
+      const batch2 = await worker.processBatch();
+      expect(batch2).toBeGreaterThanOrEqual(0);
+
+      // 8. Check child run is now completed
+      const getChildResponse = await app.inject({
+        method: "GET",
+        url: `/api/workflow/runs/${childRunId}`
+      });
+
+      expect(getChildResponse.statusCode).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const childRunData = getChildResponse.json().run;
+      expect((childRunData as Record<string, unknown>).status).toBe("completed");
+
+      // 9. Process worker batch to resume parent workflow
+      const batch3 = await worker.processBatch();
+      expect(batch3).toBeGreaterThanOrEqual(0);
+
+      // 10. Check parent run has resumed and completed
+      const getFinalResponse = await app.inject({
+        method: "GET",
+        url: `/api/workflow/runs/${parentRunId}`
+      });
+
+      expect(getFinalResponse.statusCode).toBe(200);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const finalParentData = getFinalResponse.json().run;
+      expect((finalParentData as Record<string, unknown>).status).toBe("completed");
+
+      // 11. Verify child output is merged into parent context
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const parentContext = JSON.parse(String((finalParentData as Record<string, unknown>).contextJson)) as Record<string, unknown>;
+      expect(parentContext["child-step"]).toBeDefined();
+    } finally {
+      await app.close();
     }
   });
 });

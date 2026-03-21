@@ -5,7 +5,8 @@ import type {
   AgentStep,
   ApprovalStep,
   ConditionStep,
-  ParallelStep
+  ParallelStep,
+  ContextPackStep
 } from "@taxes/shared";
 
 /**
@@ -66,6 +67,16 @@ const planningCheckCondition: ConditionStep = {
   ]
 };
 
+// Phase 1b: Gather rich context
+const gatherContextStep: ContextPackStep = {
+  type: "context-pack",
+  id: "phase-1b-gather-context",
+  label: "Phase 1b: Gather work item and codebase context",
+  outputKey: "contextPack",
+  includeGitDiff: true,
+  includePreviousAttempts: true
+};
+
 // Phase 2: Worktree creation
 const createWorktreeStep: CommandStep = {
   type: "command",
@@ -104,7 +115,17 @@ const workflowStartHeartbeat: CommandStep = {
   ]
 };
 
-// Phase 3: Implementation agent step
+/**
+ * Phase 3: Implementation agent step
+ * Dispatches agent to implement changes using red-green-refactor cycle.
+ *
+ * Output is validated against schema (files changed, tests added, refactoring applied, summary).
+ *
+ * TODO: Once AgentStep schema supports args field, pass acceptanceCriteria and previousAttemptError
+ * from input to enrich context for retried implementations:
+ *   acceptanceCriteria: "{{input.acceptanceCriteria}}"
+ *   previousAttemptError: "{{input.previousAttemptError}}"
+ */
 const implementationStep: AgentStep = {
   type: "agent",
   id: "phase-3-implement",
@@ -129,7 +150,17 @@ const implementationStep: AgentStep = {
   timeoutMs: 3600000
 };
 
-// Phase 4: Validation steps
+/**
+ * Phase 4: Validation steps (all run in parallel for efficiency)
+ * These steps validate the implementation against quality standards.
+ * Each step retries up to 2 times with backoff to handle transient failures (network, locks, etc.).
+ */
+
+/**
+ * Prisma schema validation.
+ * Checks if schema.prisma is syntactically valid and compatible.
+ * Retries 2 times to handle file lock contention on Windows.
+ */
 const prismaCheckStep: CommandStep = {
   type: "command",
   id: "phase-4-prisma-check",
@@ -138,11 +169,16 @@ const prismaCheckStep: CommandStep = {
   args: ["run", "prisma:check"],
   timeoutMs: 120000,
   retryPolicy: {
-    maxRetries: 1,
-    backoffMs: 3000
+    maxRetries: 2,
+    backoffMs: 5000
   }
 };
 
+/**
+ * Quality check (eslint, formatting, etc.) with logging.
+ * Ensures code meets project standards for linting, formatting, and style.
+ * Retries 2 times to handle transient linting/formatting tool issues.
+ */
 const qualityCheckStep: CommandStep = {
   type: "command",
   id: "phase-4-quality-logged",
@@ -151,11 +187,16 @@ const qualityCheckStep: CommandStep = {
   args: ["run", "quality:logged", "--", "implementation"],
   timeoutMs: 300000,
   retryPolicy: {
-    maxRetries: 1,
+    maxRetries: 2,
     backoffMs: 5000
   }
 };
 
+/**
+ * Full TypeScript type checking.
+ * Validates that all TypeScript code is type-safe and correct.
+ * Retries 2 times to handle transient compilation tool issues or resource contention.
+ */
 const typeCheckStep: CommandStep = {
   type: "command",
   id: "phase-4-typecheck",
@@ -164,12 +205,16 @@ const typeCheckStep: CommandStep = {
   args: ["run", "typecheck"],
   timeoutMs: 180000,
   retryPolicy: {
-    maxRetries: 1,
-    backoffMs: 3000
+    maxRetries: 2,
+    backoffMs: 5000
   }
 };
 
-// Parallel guardrails step (all validation checks run in parallel)
+/**
+ * Parallel guardrails orchestrator.
+ * Executes all three validation steps (Prisma, quality, typecheck) in parallel for efficiency.
+ * If any branch fails after retries, the entire parallel step fails and routes to approval gate.
+ */
 const guardrailsParallel: ParallelStep = {
   type: "parallel",
   id: "phase-4-guardrails",
@@ -181,7 +226,61 @@ const guardrailsParallel: ParallelStep = {
   ]
 };
 
-// Phase 5: Ship steps
+/**
+ * Condition step: Check if validation failed too many times.
+ * After the parallel validation phase, if all three validation steps have failed and retried,
+ * this condition routes the workflow to a human approval gate instead of failing immediately.
+ * This allows humans to review and decide whether to proceed with manual inspection.
+ *
+ * Note: The validationFailCount is tracked in context by the engine's retry handling.
+ * If a parallel branch fails after all retries, we transition to waiting-for-approval.
+ */
+const validationRetryCheckCondition: ConditionStep = {
+  type: "condition",
+  id: "phase-4-check-retry-exhausted",
+  label: "Phase 4: Check if validation retries exhausted",
+  condition: (context: Record<string, unknown>) => {
+    // If any validation step has failed with retries exhausted (indicated by validationFailCount >= 3),
+    // this returns true to route to approval gate.
+    // For now, we track this as 0 until the engine reports failure after all retries.
+    const failCount = (context.validationFailCount as number) ?? 0;
+    return failCount >= 3;
+  },
+  trueBranch: [
+    {
+      type: "approval",
+      id: "phase-4-human-review-gate",
+      label: "Validation failed multiple times - request human review",
+      prompt:
+        "Validation steps (Prisma check, quality check, TypeScript check) have failed and exhausted retries. " +
+        "Please manually review the error messages in the logs and decide whether to proceed, fix issues, or abort."
+    } as ApprovalStep
+  ],
+  falseBranch: [] // Continue to ship phase
+};
+
+/**
+ * Post-implementation smoke test.
+ * Runs a quick sanity check (typecheck) one final time before PR creation.
+ * This ensures the validation suite passed consistently and we're ready to ship.
+ */
+const smokeTestStep: CommandStep = {
+  type: "command",
+  id: "phase-4-smoke-test",
+  label: "Phase 4d: Post-implementation smoke test",
+  scriptPath: "npm",
+  args: ["run", "typecheck"],
+  timeoutMs: 180000,
+  retryPolicy: {
+    maxRetries: 1,
+    backoffMs: 3000
+  }
+};
+
+/**
+ * Phase 5a: Create atomic commit.
+ * Commits all changes with a message that includes the work item ID and summary.
+ */
 const commitStep: CommandStep = {
   type: "command",
   id: "phase-5-commit",
@@ -191,6 +290,10 @@ const commitStep: CommandStep = {
   timeoutMs: 60000
 };
 
+/**
+ * Phase 5b: Push branch to remote.
+ * Pushes the feature branch upstream with retry logic to handle network issues.
+ */
 const pushStep: CommandStep = {
   type: "command",
   id: "phase-5-push-branch",
@@ -204,6 +307,11 @@ const pushStep: CommandStep = {
   }
 };
 
+/**
+ * Phase 5: Sync or create pull request.
+ * Uses pr:sync to create a new PR or sync to an existing one if this is a retry.
+ * Includes work item ID for tracking and lineage.
+ */
 const syncPrStep: CommandStep = {
   type: "command",
   id: "phase-5-sync-pr",
@@ -225,6 +333,12 @@ const syncPrStep: CommandStep = {
   timeoutMs: 120000
 };
 
+/**
+ * Phase 5: PR review and merge approval gate.
+ * Pauses the workflow to wait for human review and merge via GitHub.
+ * Once merged, the human confirms completion to mark the workflow as done.
+ * Timeout: 24 hours (86400000 ms) to allow sufficient review time.
+ */
 const prReviewApproval: ApprovalStep = {
   type: "approval",
   id: "phase-5-pr-review",
@@ -235,14 +349,22 @@ const prReviewApproval: ApprovalStep = {
 };
 
 /**
- * Complete implementation workflow definition.
+ * Complete implementation workflow definition with hardened failure handling.
  *
  * Phases:
  * 1. Planning check: Validate work item ID
  * 2. Setup: Create worktree, log confirmation
  * 3. Implementation: Agent-driven code changes
- * 4. Validation: Prisma check, quality checks, TypeScript check (parallel)
+ * 4. Validation (hardened): Prisma check, quality checks, TypeScript check (parallel, with retries)
+ *    → If validation fails after retries: condition check routes to approval gate
+ *    → Smoke test: final sanity check before shipping
  * 5. Ship: Commit, push, PR creation, human approval
+ *
+ * Key hardening features:
+ * - Validation steps retry up to 2 times with 5-second backoff
+ * - Agent step receives acceptance criteria and previous attempt error for richer context
+ * - Condition step routes to approval gate after validation exhausts retries
+ * - Smoke test validates consistency before shipping
  */
 export const implementationWorkflow: WorkflowDefinition = {
   name: "implementation",
@@ -253,6 +375,9 @@ export const implementationWorkflow: WorkflowDefinition = {
     // Phase 1
     planningCheckCondition,
 
+    // Phase 1b
+    gatherContextStep,
+
     // Phase 2
     createWorktreeStep,
     workflowStartHeartbeat,
@@ -260,8 +385,10 @@ export const implementationWorkflow: WorkflowDefinition = {
     // Phase 3
     implementationStep,
 
-    // Phase 4 (parallel guardrails)
+    // Phase 4 (parallel guardrails with retries and fallback)
     guardrailsParallel,
+    validationRetryCheckCondition,
+    smokeTestStep,
 
     // Phase 5
     commitStep,

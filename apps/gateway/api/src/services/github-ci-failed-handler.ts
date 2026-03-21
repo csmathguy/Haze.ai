@@ -98,7 +98,7 @@ export class GitHubCiFailedHandler {
       data: {
         type: "github.ci.failed",
         source: "github",
-        correlationId: `pr-${prNumber}`,
+        correlationId: `pr-${String(prNumber)}`,
         payload: JSON.stringify(eventPayload)
       }
     });
@@ -130,7 +130,7 @@ export class GitHubCiFailedHandler {
     const pattern = /PLAN-(\d+)/i;
     const match = pattern.exec(text);
 
-    if (match && match[1]) {
+    if (match?.[1]) {
       return `PLAN-${match[1]}`;
     }
 
