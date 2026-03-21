@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PrismaClient, WorkflowStepRun, Agent, Skill } from "@taxes/db";
 import type { AgentStep, WorkflowRun } from "@taxes/shared";
 import { parseStreamJson } from "./agent-step-stream-parser.js";
@@ -208,6 +210,18 @@ export class AgentStepExecutor {
   }
 
   /**
+   * Reads the SKILL.md file content from disk for a given skill name.
+   */
+  private readSkillContent(skillName: string): string {
+    try {
+      const skillPath = join(process.cwd(), "skills", skillName, "SKILL.md");
+      return readFileSync(skillPath, "utf-8");
+    } catch {
+      return "";
+    }
+  }
+
+  /**
    * Builds the prompt from skill definitions and step context.
    */
   private buildPrompt(
@@ -216,6 +230,15 @@ export class AgentStepExecutor {
     step: AgentStep,
     run: WorkflowRun
   ): string {
+    // Build skills section with full SKILL.md content
+    const skillsSection = skills.map((s) => {
+      const content = this.readSkillContent(s.name);
+      if (content) {
+        return `## Skill: ${s.name}\n\n${content}`;
+      }
+      return `## Skill: ${s.name}\n${s.description ?? "No description"}`;
+    }).join("\n\n---\n\n");
+
     // System prompt with agent context
     const systemPrompt = `You are an agent executing the following step in a workflow.
 
@@ -224,7 +247,7 @@ Step: ${step.label}
 Model: ${step.model}
 
 Available Skills:
-${skills.map((s) => `- ${s.name} (v${s.version}): ${s.description ?? "No description"}`).join("\n")}
+${skillsSection}
 
 Workflow Context:
 ${JSON.stringify(run.contextJson, null, 2)}

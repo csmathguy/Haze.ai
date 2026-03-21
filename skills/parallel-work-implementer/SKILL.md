@@ -21,8 +21,10 @@ This skill keeps an implementation agent inside its assigned slice so parallel w
    ```
    Limit initial file reads to the returned paths. Skip when the slice brief already lists exact files.
 4. Read the closest docs for the owned boundary.
-5. Start the audited workflow: `node tools/runtime/run-npm.cjs run workflow:start implementation "<task summary>"`.
-   Log an initial heartbeat: `npm run agent:heartbeat -- --message 'workflow started'`
+5. If running outside the workflow engine, register the run:
+   `node tools/workflow/start-workflow-run.cjs implementation <WORK_ITEM_ID> "<task summary>"`
+   If already running inside the workflow engine (the typical case), this step is handled automatically.
+   Log an initial heartbeat: `npm run agent:heartbeat -- --message 'implementation started'`
 6. Implement only within the allowed scope. Do not edit files outside the declared boundary.
    Log a heartbeat after each major phase: `npm run agent:heartbeat -- --message '<phase description>'`
 7. Run validation: `node tools/runtime/run-npm.cjs run quality:changed -- <changed files>`.
@@ -30,7 +32,8 @@ This skill keeps an implementation agent inside its assigned slice so parallel w
 8. Commit changes and push the branch.
 9. Open the PR: `node tools/runtime/run-npm.cjs run pr:sync -- --summary "..." --value "..." --privacy-confirmed`.
    Log a final heartbeat: `npm run agent:heartbeat -- --message 'PR opened, handoff complete'`
-10. End the workflow: `node tools/runtime/run-npm.cjs run workflow:end implementation success`.
+10. The workflow engine marks the run complete automatically after all steps succeed.
+    If running outside the engine, signal completion via the workflow API or the workflow UI.
 11. Report back to the orchestrator: the PR URL, any warnings, and any residual conflict risks.
 
 ## What the Task Prompt Should Contain
