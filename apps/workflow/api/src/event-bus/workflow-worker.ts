@@ -4,13 +4,15 @@ import { WorkflowEngine } from "@taxes/shared";
 
 import { EventBus } from "./event-bus.js";
 import { checkForWaitForEventMatches, checkForTimedOutWaitingSteps } from "./wait-for-event-handler.js";
+import { resumeParentForCompletedChildren } from "./child-workflow-handler.js";
 import { GitHubPrMergedHandler } from "../services/github-pr-merged-handler.js";
+import { createFollowUpWorkItemForFailedRun } from "../services/failed-run-followup-service.js";
 import * as workflowDefinitionService from "../services/workflow-definition-service.js";
 import { StepExecutionHandler } from "../executor/step-execution-handler.js";
 
 /** Internal step-status notification event types that the worker emits for observability only. */
 function isInternalStepNotification(eventType: string): boolean {
-  return eventType === "step.waiting-for-event" || eventType === "step.waiting-for-approval";
+  return eventType === "step.waiting-for-event" || eventType === "step.waiting-for-approval" || eventType === "step.waiting-for-child-workflow";
 }
 
 export interface WorkerConfig {
@@ -70,6 +72,7 @@ export class WorkflowWorker {
   /** Process one batch of pending events — public for testing */
   async processBatch(): Promise<number> {
     await checkForTimedOutWaitingSteps(this.db);
+    await resumeParentForCompletedChildren(this.db);
     const events = await this.eventBus.fetchPending(this.batchSize);
 
     if (events.length === 0) {
@@ -351,6 +354,8 @@ export class WorkflowWorker {
   }
 
   private async updateRun(runId: string, result: WorkflowRunEffect): Promise<void> {
+    const previousStatus = (await this.db.workflowRun.findUnique({ where: { id: runId } }))?.status;
+
     await this.db.workflowRun.update({
       where: { id: runId },
       data: {
@@ -361,6 +366,52 @@ export class WorkflowWorker {
         completedAt: result.nextRun.completedAt ? new Date(result.nextRun.completedAt) : null
       }
     });
+
+    // If the run transitioned to failed, create a follow-up work item
+    if (result.nextRun.status === "failed" && previousStatus !== "failed") {
+      // Fire-and-forget — log errors but don't throw
+      void this.createFollowUpIfNeeded(runId, result.nextRun.currentStepId, result.nextRun.contextJson).catch(
+        (error) => {
+          console.error(`Failed to create follow-up work item for run ${runId}:`, error);
+        }
+      );
+    }
+  }
+
+  private async createFollowUpIfNeeded(
+    runId: string,
+    failedStepId: string | undefined,
+    contextJson: Record<string, unknown>
+  ): Promise<void> {
+    if (!this.planningDatabaseUrl) {
+      return;
+    }
+
+    // Extract failure reason from context if available
+    const failureReason = this.extractFailureReason(contextJson);
+
+    await createFollowUpWorkItemForFailedRun(
+      runId,
+      contextJson,
+      failedStepId,
+      failureReason,
+      this.planningDatabaseUrl
+    );
+  }
+
+  private extractFailureReason(contextJson: Record<string, unknown>): string | undefined {
+    // Try to extract error message from various possible locations
+    const error = contextJson.error as Record<string, unknown> | undefined;
+    if (error && typeof error.message === "string") {
+      return error.message;
+    }
+
+    const failureReason = contextJson.failureReason;
+    if (typeof failureReason === "string") {
+      return failureReason;
+    }
+
+    return undefined;
   }
 
   private async applyEffects(
@@ -435,6 +486,7 @@ export class WorkflowWorker {
       case "approval":
         return "approval";
       case "wait-for-event":
+      case "child-workflow":
         return "wait";
       case "command":
       case "timer":
