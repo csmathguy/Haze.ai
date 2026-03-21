@@ -29,6 +29,7 @@ const WorkflowStepRunSchema = z.object({
   stdout: z.string().nullable(),
   stderr: z.string().nullable(),
   retryCount: z.number().int(),
+  tokenUsageJson: z.string().nullable().optional(),
   startedAt: z.string(),
   completedAt: z.string().nullable()
 });
@@ -177,4 +178,69 @@ export async function getWorkflowAnalytics(
   const data = (await response.json()) as unknown;
   const parsed = AnalyticsResponseSchema.parse(data);
   return parsed.analytics;
+}
+
+const RunSummarySchema = z.object({
+  id: z.string(),
+  definitionName: z.string(),
+  status: z.string(),
+  currentStep: z.string().nullable(),
+  startedAt: z.string(),
+  elapsedMs: z.number(),
+  isStalled: z.boolean(),
+  pendingApprovalId: z.string().nullable()
+});
+
+export type RunSummary = z.infer<typeof RunSummarySchema>;
+
+const FleetDashboardResponseSchema = z.object({
+  counts: z.object({
+    running: z.number(),
+    waiting: z.number(),
+    failed: z.number(),
+    completed: z.number()
+  }),
+  activeRuns: z.array(RunSummarySchema),
+  recentRuns: z.array(RunSummarySchema)
+});
+
+export type FleetDashboardData = z.infer<typeof FleetDashboardResponseSchema>;
+
+export async function getFleetDashboard(): Promise<FleetDashboardData> {
+  const response = await fetch("/api/workflow/runs/summary");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch fleet dashboard: ${response.statusText}`);
+  }
+  const data = (await response.json()) as unknown;
+  const parsed = FleetDashboardResponseSchema.parse(data);
+  return parsed;
+}
+
+export async function cancelWorkflowRun(id: string): Promise<WorkflowRun> {
+  const response = await fetch(`/api/workflow/runs/${encodeURIComponent(id)}`, {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to cancel workflow run: ${response.statusText}`);
+  }
+  const data = (await response.json()) as unknown;
+  const parsed = WorkflowRunResponseSchema.parse(data);
+  return parsed.run;
+}
+
+export async function approveWorkflowRun(approvalId: string, respondedBy = "fleet-dashboard"): Promise<void> {
+  const response = await fetch(`/api/workflow/approvals/${encodeURIComponent(approvalId)}/respond`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      decision: "approved",
+      respondedBy,
+      notes: "Approved from fleet dashboard"
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to approve workflow run: ${response.statusText}`);
+  }
 }
