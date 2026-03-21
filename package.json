@@ -104,7 +104,8 @@
     "execution:end": "node ./node_modules/tsx/dist/cli.mjs tools/agent/execution-log.ts end",
     "workflow:start": "node ./node_modules/tsx/dist/cli.mjs tools/agent/workflow-log.ts start",
     "workflow:note": "node ./node_modules/tsx/dist/cli.mjs tools/agent/workflow-log.ts note",
-    "workflow:end": "node ./node_modules/tsx/dist/cli.mjs tools/agent/workflow-log.ts end"
+    "workflow:end": "node ./node_modules/tsx/dist/cli.mjs tools/agent/workflow-log.ts end",
+    "workflow:run": "node ./node_modules/tsx/dist/cli.mjs tools/workflow/workflow-run.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

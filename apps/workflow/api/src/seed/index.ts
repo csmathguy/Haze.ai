@@ -2,6 +2,7 @@ import type { PrismaClient } from "@taxes/db";
 import { seedAgents } from "./agents.js";
 import { seedSkills } from "./skills.js";
 import { seedImplementationWorkflow } from "./implementation-workflow.js";
+import { registerWorkflowDefinitions } from "./register-definitions.js";
 
 export async function seedDatabase(prisma: PrismaClient): Promise<void> {
   console.warn("Seeding agents...");
@@ -15,4 +16,8 @@ export async function seedDatabase(prisma: PrismaClient): Promise<void> {
   console.warn("Seeding workflows...");
   await seedImplementationWorkflow(prisma);
   console.warn("Workflows seeded successfully.");
+
+  console.warn("Registering workflow definitions...");
+  await registerWorkflowDefinitions(prisma);
+  console.warn("Workflow definitions registered successfully.");
 }
