@@ -29,8 +29,7 @@ describe("WorkflowEngine - Integration Tests", () => {
         label: "Execute command",
         scriptPath: "/path/to/script.sh",
         args: ["--flag"],
-        timeoutMs: 30000,
-        retryPolicy: { maxRetries: 2, backoffMs: 1000 }
+        timeoutMs: 30000
       } as CommandStep
     ]
   };
@@ -43,13 +42,13 @@ describe("WorkflowEngine - Integration Tests", () => {
     steps: [
       {
         type: "command",
-        id: "cmd-1",
+        id: "1",
         label: "First command",
         scriptPath: "/path/to/script1.sh"
       } as CommandStep,
       {
         type: "command",
-        id: "cmd-2",
+        id: "2",
         label: "Second command",
         scriptPath: "/path/to/script2.sh"
       } as CommandStep
@@ -60,7 +59,7 @@ describe("WorkflowEngine - Integration Tests", () => {
     it("handles workflow with multiple steps", () => {
       const result = engine.startRun(multiStepDefinition, {});
 
-      expect(result.nextRun.currentStepId).toBe("cmd-1");
+      expect(result.nextRun.currentStepId).toBe("1");
       expect(result.effects[0]?.type).toBe("execute-step");
     });
 
@@ -105,7 +104,7 @@ describe("WorkflowEngine - Integration Tests", () => {
 
       const advanceResult = engine.advanceRun(startResult.nextRun, {
         type: "success"
-      });
+      }, simpleDefinition);
 
       expect(advanceResult.nextRun.id).toBe(originalId);
     });
@@ -114,7 +113,7 @@ describe("WorkflowEngine - Integration Tests", () => {
       const startResult = engine.startRun(simpleDefinition, {});
       const run = startResult.nextRun;
 
-      const advanceResult = engine.advanceRun(run, { type: "success" });
+      const advanceResult = engine.advanceRun(run, { type: "success" }, simpleDefinition);
 
       expect(advanceResult.nextRun.definitionName).toBe("simple-workflow");
       expect(advanceResult.nextRun.version).toBe("1.0.0");
@@ -126,8 +125,10 @@ describe("WorkflowEngine - Integration Tests", () => {
 
       const advanceResult = engine.advanceRun(startResult.nextRun, {
         type: "success"
-      });
-      expect(advanceResult.nextRun.completedAt).toBeDefined();
+      }, multiStepDefinition);
+      // After first step succeeds in a 2-step workflow, it should advance to next step (not complete)
+      expect(advanceResult.nextRun.completedAt).toBeUndefined();
+      expect(advanceResult.nextRun.status).toBe("running");
     });
 
     it("failed state is terminal", () => {
@@ -137,7 +138,7 @@ describe("WorkflowEngine - Integration Tests", () => {
       const failResult = engine.advanceRun(run, {
         type: "failure",
         error: { message: "Error" }
-      });
+      }, simpleDefinition);
 
       expect(failResult.nextRun.status).toBe("failed");
       expect(failResult.nextRun.completedAt).toBeDefined();
@@ -149,7 +150,7 @@ describe("WorkflowEngine - Integration Tests", () => {
 
       const completeResult = engine.advanceRun(run, {
         type: "success"
-      });
+      }, simpleDefinition);
 
       expect(completeResult.nextRun.status).toBe("completed");
       expect(completeResult.nextRun.completedAt).toBeDefined();

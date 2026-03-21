@@ -3,6 +3,7 @@ import { WorkflowEngine } from "@taxes/shared";
 
 import { EventBus } from "./event-bus.js";
 import { GitHubPrMergedHandler } from "../services/github-pr-merged-handler.js";
+import * as workflowDefinitionService from "../services/workflow-definition-service.js";
 
 export interface WorkerConfig {
   readonly pollIntervalMs: number;   // default 1000
@@ -102,6 +103,12 @@ export class WorkflowWorker {
         return;
       }
 
+      // Load the workflow definition from the database
+      const definition = await workflowDefinitionService.getDefinitionByName(
+        this.db,
+        run.definitionName
+      );
+
       const runData = this.convertRunToSchema(run);
       const workflowEvent = {
         type: event.type,
@@ -109,7 +116,23 @@ export class WorkflowWorker {
       };
 
       const engine = new WorkflowEngine();
-      const result = engine.signalRun(runData, workflowEvent);
+      let result;
+
+      if (definition) {
+        const definitionJson = JSON.parse(definition.definitionJson) as Record<string, unknown>;
+        const workflowDefinition = {
+          name: definition.name,
+          version: definition.version,
+          triggers: JSON.parse(definition.triggerEvents) as string[],
+          inputSchema: {} as never,
+          steps: (definitionJson.steps ?? []) as never[]
+        };
+
+        result = engine.signalRun(runData, workflowEvent, workflowDefinition);
+      } else {
+        // Fallback: signal without definition (for events that don't need it)
+        result = engine.signalRun(runData, workflowEvent);
+      }
 
       await this.updateRun(run.id, result);
       await this.applyEffects(run.id, result.effects);
@@ -218,12 +241,13 @@ export class WorkflowWorker {
           }
         });
       } else if (effect.type === "create-approval") {
-        const approvalEffect = effect as { type: string; stepId: string; prompt: string };
+        const approvalEffect = effect as { type: string; stepId: string; prompt: string; timeoutMs?: number };
         await this.db.workflowApproval.create({
           data: {
             runId,
             stepId: approvalEffect.stepId,
-            prompt: approvalEffect.prompt
+            prompt: approvalEffect.prompt,
+            ...(approvalEffect.timeoutMs !== undefined && { timeoutMs: approvalEffect.timeoutMs })
           }
         });
       }
