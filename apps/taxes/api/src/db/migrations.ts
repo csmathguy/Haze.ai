@@ -65,9 +65,41 @@ function applyMigration(database: Database.Database, migration: MigrationEntry):
     });
     database.exec("COMMIT");
   } catch (error) {
+    if (isDuplicateColumnNameError(error) && migrationAlreadyApplied(database, migration.sql)) {
+      insertMigration.run({
+        appliedAt: new Date().toISOString(),
+        checksum: migration.checksum,
+        name: migration.name
+      });
+      database.exec("COMMIT");
+      return;
+    }
+
     database.exec("ROLLBACK");
     throw error;
   }
+}
+
+function isDuplicateColumnNameError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("duplicate column name:");
+}
+
+function migrationAlreadyApplied(database: Database.Database, sql: string): boolean {
+  const addedColumnMatch = /ALTER TABLE\s+"([^"]+)"\s+ADD COLUMN\s+"([^"]+)"/i.exec(sql);
+
+  if (addedColumnMatch === null) {
+    return false;
+  }
+
+  const tableName = addedColumnMatch[1];
+  const columnName = addedColumnMatch[2];
+
+  if (tableName === undefined || columnName === undefined) {
+    return false;
+  }
+
+  const columns = database.prepare(`PRAGMA table_info("${tableName}")`).all() as { name: string }[];
+  return columns.some((column) => column.name === columnName);
 }
 
 function configureDatabase(database: Database.Database, databaseFilePath: string): void {
