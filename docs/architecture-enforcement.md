@@ -27,7 +27,7 @@ ArchUnit is a strong architecture-testing tool for JVM projects. This repository
 - prevent production source files from importing `*.test.ts` and `*.spec.ts`
 - forbid circular dependencies inside the app and shared source trees
 - forbid circular dependencies inside repo tooling
-- fail when application, shared, or tooling files exceed the 400-line file budget
+- fail when application, shared, or tooling files exceed the 750-line file budget
 
 ## Suggested ESLint Rules
 

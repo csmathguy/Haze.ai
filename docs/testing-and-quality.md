@@ -53,7 +53,7 @@ Creating or updating the PR is the last publication step for an agent. The later
 
 The current repository guardrails enforce these defaults:
 
-- max file length: 400 lines, excluding blank lines and comments
+- max file length: 750 lines, excluding blank lines and comments
 - max function length: 75 lines, excluding blank lines and comments
 - max cyclomatic complexity: 10
 - max nesting depth: 3
