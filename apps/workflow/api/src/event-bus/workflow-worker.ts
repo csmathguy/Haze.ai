@@ -418,7 +418,7 @@ export class WorkflowWorker {
     }
 
     const step = effect.step as { id: string; type: string; [key: string]: unknown };
-    const handler = new StepExecutionHandler(this.db);
+    const handler = new StepExecutionHandler(this.db, this.planningDatabaseUrl);
 
     // Execute the step and get the engine's next state
     const advanceResult = await handler.executeAndAdvance(runId, currentRun, step, definition);
