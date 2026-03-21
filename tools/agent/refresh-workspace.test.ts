@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { hasPendingCheckoutChanges } from "./refresh-workspace.js";
+import { hasPendingCheckoutChanges, parseCheckoutMode } from "./refresh-workspace.js";
+
+type CheckoutMode = "auto" | "current-worktree" | "main";
+
+const parseCheckoutModeTyped: (value: string) => CheckoutMode = parseCheckoutMode;
 
 describe("hasPendingCheckoutChanges", () => {
   it("returns false when git status output is empty", () => {
@@ -10,5 +14,17 @@ describe("hasPendingCheckoutChanges", () => {
   it("returns true when git status output contains staged or unstaged entries", () => {
     expect(hasPendingCheckoutChanges("M  tools/agent/refresh-workspace.ts\n")).toBe(true);
     expect(hasPendingCheckoutChanges("?? apps/gateway/api/src/db/migrations.test.ts\n")).toBe(true);
+  });
+});
+
+describe("parseCheckoutMode", () => {
+  it("accepts supported checkout modes", () => {
+    expect(parseCheckoutModeTyped("auto")).toBe("auto");
+    expect(parseCheckoutModeTyped("current-worktree")).toBe("current-worktree");
+    expect(parseCheckoutModeTyped("main")).toBe("main");
+  });
+
+  it("rejects unsupported checkout modes", () => {
+    expect(() => parseCheckoutModeTyped("feature")).toThrow(/Unsupported checkout/);
   });
 });

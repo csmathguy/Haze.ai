@@ -8,6 +8,7 @@ const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(moduleDirectory, "..", "..");
 
 interface RefreshOptions {
+  checkout: "auto" | "current-worktree" | "main";
   branch: string;
   remote: string;
   environmentIds: string[];
@@ -16,21 +17,23 @@ interface RefreshOptions {
 
 async function main(): Promise<void> {
   const options = parseArgs();
+  const checkoutRoot = resolveCheckoutRoot(options.checkout);
 
   writeInfo("Refreshing the Taxes repository and services...");
-  assertCheckoutClean(repositoryRoot);
-  await runShortCommand("git fetch", "git", ["fetch", options.remote, options.branch]);
-  await runShortCommand("git pull", "git", ["pull", options.remote, options.branch]);
-  await runShortCommand("npm install", "node", [
+  writeInfo(`Using checkout: ${checkoutRoot}`);
+  assertCheckoutClean(checkoutRoot);
+  await runShortCommand(checkoutRoot, "git fetch", "git", ["fetch", options.remote, options.branch]);
+  await runShortCommand(checkoutRoot, "git pull", "git", ["pull", options.remote, options.branch]);
+  await runShortCommand(checkoutRoot, "npm install", "node", [
     "tools/runtime/run-npm.cjs",
     "install"
   ]);
   await ensureMuiDependencyIntegrity({
     log: writeInfo,
     reinstall: async () => {
-      await runShortCommand("npm install (repair)", "node", ["tools/runtime/run-npm.cjs", "install"]);
+      await runShortCommand(checkoutRoot, "npm install (repair)", "node", ["tools/runtime/run-npm.cjs", "install"]);
     },
-    repositoryRoot
+    repositoryRoot: checkoutRoot
   });
 
   if (options.skipDev) {
@@ -38,14 +41,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  const services = getRequestedServices(options.environmentIds);
+  const services = getRequestedServices(options.environmentIds, checkoutRoot);
   stopExistingServicesForPorts(services);
-  await startDevEnvironment(options.environmentIds);
+  await startDevEnvironment(options.environmentIds, checkoutRoot);
 }
 
 function parseArgs(): RefreshOptions {
   const args = process.argv.slice(2);
   const options: RefreshOptions = {
+    checkout: "auto",
     branch: "main",
     remote: "origin",
     environmentIds: [],
@@ -78,6 +82,9 @@ function parseArgs(): RefreshOptions {
 
 function applyArgument(options: RefreshOptions, args: string[], index: number, token: string): number {
   switch (token) {
+    case "--checkout":
+      options.checkout = parseCheckoutMode(readRequiredValue(args, index, "--checkout"));
+      return index + 1;
     case "--branch":
       options.branch = readRequiredValue(args, index, "--branch");
       return index + 1;
@@ -114,6 +121,7 @@ function printUsage(): void {
 Usage: npm run repo:refresh [options]
 
 Options:
+  --checkout <mode>          Checkout to refresh (auto, current-worktree, main; default: auto)
   --branch <name>            Git branch to update (default: main)
   --remote <name>            Remote name to fetch from (default: origin)
   --environment <id>         Launch this dev environment after refresh (repeatable or comma-separated; default: all)
@@ -149,18 +157,18 @@ export function hasPendingCheckoutChanges(statusOutput: string): boolean {
   return statusOutput.trim().length > 0;
 }
 
-async function runShortCommand(label: string, command: string, args: string[]): Promise<void> {
+async function runShortCommand(checkoutRoot: string, label: string, command: string, args: string[]): Promise<void> {
   writeInfo(`Running ${label}...`);
 
-  await runCommand(command, args).catch((error: unknown) => {
+  await runCommand(command, args, checkoutRoot).catch((error: unknown) => {
     throw new Error(`${label} failed: ${toErrorMessage(error)}`);
   });
 }
 
-async function runCommand(command: string, args: string[]): Promise<void> {
+async function runCommand(command: string, args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: repositoryRoot,
+      cwd,
       stdio: "inherit",
       windowsHide: true
     });
@@ -185,7 +193,7 @@ async function runCommand(command: string, args: string[]): Promise<void> {
   });
 }
 
-async function startDevEnvironment(environmentIds: string[]): Promise<void> {
+async function startDevEnvironment(environmentIds: string[], checkoutRoot: string): Promise<void> {
   const args = [
     "tools/runtime/run-npm.cjs",
     "run",
@@ -195,16 +203,16 @@ async function startDevEnvironment(environmentIds: string[]): Promise<void> {
   ];
   writeInfo(`Starting dev environment(s): ${environmentIds.join(", ")}`);
 
-  await runLongRunningCommand("node", args);
+  await runLongRunningCommand("node", args, checkoutRoot);
 }
 
-function getRequestedServices(environmentIds: string[]): DevServiceLaunchPlan[] {
+function getRequestedServices(environmentIds: string[], checkoutRoot: string): DevServiceLaunchPlan[] {
   const parsed = parseDevEnvironmentArgs(
     environmentIds.flatMap((environmentId) => ["--environment", environmentId]),
     { requireEnvironmentSelection: true }
   );
   const plan = createDevEnvironmentPlan(parsed, {
-    main: repositoryRoot
+    main: checkoutRoot
   });
   return plan.services;
 }
@@ -320,10 +328,73 @@ function stopProcess(processId: number): void {
   }
 }
 
-async function runLongRunningCommand(command: string, args: string[]): Promise<void> {
+function resolveCheckoutRoot(checkoutMode: RefreshOptions["checkout"]): string {
+  if (checkoutMode === "main") {
+    return repositoryRoot;
+  }
+
+  if (checkoutMode === "current-worktree") {
+    return process.cwd();
+  }
+
+  if (!hasPendingCheckoutChanges(readGitStatus(repositoryRoot))) {
+    return repositoryRoot;
+  }
+
+  const worktrees = listWorktrees(repositoryRoot);
+  const cleanWorktree = worktrees.find((worktree) => worktree.worktreePath !== repositoryRoot && !hasPendingCheckoutChanges(readGitStatus(worktree.worktreePath)));
+
+  if (cleanWorktree !== undefined) {
+    return cleanWorktree.worktreePath;
+  }
+
+  return repositoryRoot;
+}
+
+function readGitStatus(cwd: string): string {
+  const status = spawnSync("git", ["status", "--short"], {
+    cwd,
+    encoding: "utf8",
+    windowsHide: true
+  });
+
+  if (status.error !== undefined) {
+    throw status.error;
+  }
+
+  return status.stdout;
+}
+
+function listWorktrees(repoRoot: string): { worktreePath: string }[] {
+  const output = execFileSync("git", ["worktree", "list", "--porcelain"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"]
+  });
+  const worktrees: { worktreePath: string }[] = [];
+  let current: { worktreePath?: string } = {};
+
+  for (const line of output.split(/\r?\n/u)) {
+    if (line.startsWith("worktree ")) {
+      if (current.worktreePath !== undefined) {
+        worktrees.push({ worktreePath: current.worktreePath });
+      }
+
+      current = { worktreePath: line.slice("worktree ".length).trim() };
+    }
+  }
+
+  if (current.worktreePath !== undefined) {
+    worktrees.push({ worktreePath: current.worktreePath });
+  }
+
+  return worktrees;
+}
+
+async function runLongRunningCommand(command: string, args: string[], checkoutRoot: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: repositoryRoot,
+      cwd: checkoutRoot,
       stdio: "inherit",
       windowsHide: true
     });
@@ -370,6 +441,14 @@ function attachSignalForwarding(child: ChildProcess): void {
   });
 }
 
+export function parseCheckoutMode(value: string): RefreshOptions["checkout"] {
+  if (value === "auto" || value === "current-worktree" || value === "main") {
+    return value;
+  }
+
+  throw new Error(`Unsupported checkout "${value}". Use auto, current-worktree, or main.`);
+}
+
 function writeInfo(message: string): void {
   process.stdout.write(`${message}\n`);
 }
@@ -382,7 +461,17 @@ function toErrorMessage(error: unknown): string {
   return String(error);
 }
 
-void main().catch((error: unknown) => {
-  process.stderr.write(`${toErrorMessage(error)}\n`);
-  process.exitCode = 1;
-});
+if (isMainModule()) {
+  void main().catch((error: unknown) => {
+    process.stderr.write(`${toErrorMessage(error)}\n`);
+    process.exitCode = 1;
+  });
+}
+
+function isMainModule(): boolean {
+  if (process.argv[1] === undefined) {
+    return false;
+  }
+
+  return path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+}
