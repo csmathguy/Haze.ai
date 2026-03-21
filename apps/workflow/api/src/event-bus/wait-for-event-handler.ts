@@ -18,7 +18,7 @@ export async function checkForWaitForEventMatches(
   payload: Record<string, unknown>
 ): Promise<boolean> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-  const waitingStepRuns: Array<{ id: string; runId: string; inputJson: string | null; run: { status: string } }> = await (db as any).workflowStepRun.findMany({
+  const waitingStepRuns: { id: string; runId: string; inputJson: string | null; run: { status: string } }[] = await (db as any).workflowStepRun.findMany({
     where: { stepType: "wait-for-event", completedAt: null },
     include: { run: true }
   });
@@ -58,7 +58,7 @@ export async function checkForTimedOutWaitingSteps(db: PrismaClient): Promise<vo
   const now = new Date().toISOString();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-  const waitingStepRuns: Array<{ id: string; runId: string; inputJson: string | null; run: { status: string } }> = await (db as any).workflowStepRun.findMany({
+  const waitingStepRuns: { id: string; runId: string; inputJson: string | null; run: { status: string } }[] = await (db as any).workflowStepRun.findMany({
     where: { stepType: "wait-for-event", completedAt: null },
     include: { run: true }
   });

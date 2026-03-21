@@ -21,7 +21,7 @@ import { ConditionStepExecutor } from "./condition-step-executor.js";
 import { recordStepStart, recordStepComplete, recordStepFailed } from "./step-run-persistence.js";
 import { executeWaitForEventStep } from "./wait-for-event-executor.js";
 import { executeChildWorkflowStep } from "./child-workflow-executor.js";
-import { executeContextPackStep } from "./context-pack-executor.js";
+import { executeContextPackStep, type ContextPackStep } from "./context-pack-executor.js";
 import { EventBus } from "../event-bus/event-bus.js";
 import * as approvalService from "../services/approval-service.js";
 
@@ -438,7 +438,7 @@ export class StepExecutionHandler {
     let stepResult: StepResult;
 
     try {
-      const contextPackStep = {
+      const contextPackStep: ContextPackStep = {
         type: "context-pack" as const,
         id: step.id,
         label: (step.label as string | undefined) ?? step.id,
@@ -448,13 +448,12 @@ export class StepExecutionHandler {
         includePreviousAttempts: (step.includePreviousAttempts as boolean | undefined) ?? true
       };
 
-      const result = await executeContextPackStep(
-        this.db,
-        runId,
+      const result = await executeContextPackStep({
+        db: this.db,
         run,
-        contextPackStep,
-        this.planningDatabaseUrl
-      );
+        step: contextPackStep,
+        planningDatabaseUrl: this.planningDatabaseUrl
+      });
 
       await recordStepComplete(this.db, stepRun.id, {
         stepId: step.id,

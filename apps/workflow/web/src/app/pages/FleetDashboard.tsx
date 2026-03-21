@@ -45,20 +45,19 @@ const formatElapsedTime = (ms: number): string => {
   const hours = Math.floor(minutes / 60);
 
   if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
+    return `${hours.toString()}h ${(minutes % 60).toString()}m`;
   } else if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
+    return `${minutes.toString()}m ${(seconds % 60).toString()}s`;
   } else {
-    return `${seconds}s`;
+    return `${seconds.toString()}s`;
   }
 };
 
 interface StatusIndicatorProps {
   status: string;
-  isRunning?: boolean;
 }
 
-const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status, isRunning }) => {
+const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status }) => {
   if (status === "running") {
     return (
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -102,6 +101,53 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status, isRunning }) 
   );
 };
 
+interface FleetRowActionsProps {
+  run: RunSummary;
+  cancelingRunId: string | null;
+  approvingApprovalId: string | null;
+  onViewRun: (id: string) => void;
+  onCancel: (runId: string, e: React.MouseEvent) => void;
+  onApprove: (approvalId: string, e: React.MouseEvent) => void;
+}
+
+const FleetRowActions: React.FC<FleetRowActionsProps> = ({
+  run, cancelingRunId, approvingApprovalId, onViewRun, onCancel, onApprove
+}) => (
+  <Stack direction="row" spacing={1}>
+    {run.pendingApprovalId && (
+      <Button
+        size="small"
+        variant="contained"
+        color="success"
+        startIcon={<CheckCircleIcon />}
+        onClick={(e) => { if (run.pendingApprovalId) onApprove(run.pendingApprovalId, e); }}
+        disabled={approvingApprovalId === run.pendingApprovalId}
+      >
+        {approvingApprovalId === run.pendingApprovalId ? "..." : "Approve"}
+      </Button>
+    )}
+    {(run.status === "running" || run.status === "waiting") && (
+      <Button
+        size="small"
+        variant="outlined"
+        color="error"
+        startIcon={<CancelIcon />}
+        onClick={(e) => { onCancel(run.id, e); }}
+        disabled={cancelingRunId === run.id}
+      >
+        {cancelingRunId === run.id ? "..." : "Cancel"}
+      </Button>
+    )}
+    <Button
+      size="small"
+      variant="outlined"
+      onClick={(e) => { e.stopPropagation(); onViewRun(run.id); }}
+    >
+      View
+    </Button>
+  </Stack>
+);
+
 interface FleetTableProps {
   runs: RunSummary[];
   onViewRun: (id: string) => void;
@@ -110,34 +156,20 @@ interface FleetTableProps {
   isLoading?: boolean;
 }
 
-const FleetTable: React.FC<FleetTableProps> = ({
-  runs,
-  onViewRun,
-  onCancelRun,
-  onApproveRun,
-  isLoading
-}) => {
+const FleetTable: React.FC<FleetTableProps> = ({ runs, onViewRun, onCancelRun, onApproveRun, isLoading }) => {
   const [cancelingRunId, setCancelingRunId] = useState<string | null>(null);
   const [approvingApprovalId, setApprovingApprovalId] = useState<string | null>(null);
 
-  const handleCancel = async (runId: string, e: React.MouseEvent) => {
+  const handleCancel = (runId: string, e: React.MouseEvent): void => {
     e.stopPropagation();
     setCancelingRunId(runId);
-    try {
-      await onCancelRun(runId);
-    } finally {
-      setCancelingRunId(null);
-    }
+    void onCancelRun(runId).finally(() => { setCancelingRunId(null); });
   };
 
-  const handleApprove = async (approvalId: string, e: React.MouseEvent) => {
+  const handleApprove = (approvalId: string, e: React.MouseEvent): void => {
     e.stopPropagation();
     setApprovingApprovalId(approvalId);
-    try {
-      await onApproveRun(approvalId);
-    } finally {
-      setApprovingApprovalId(null);
-    }
+    void onApproveRun(approvalId).finally(() => { setApprovingApprovalId(null); });
   };
 
   return (
@@ -167,78 +199,35 @@ const FleetTable: React.FC<FleetTableProps> = ({
               </TableCell>
             </TableRow>
           )}
-          {!isLoading &&
-            runs.map((run) => (
-              <TableRow
-                key={run.id}
-                sx={{
-                  "&:hover": { backgroundColor: "action.hover" },
-                  cursor: "pointer",
-                  backgroundColor: run.isStalled ? "rgba(255, 152, 0, 0.1)" : "transparent"
-                }}
-                onClick={() => {
-                  onViewRun(run.id);
-                }}
-              >
-                <TableCell>{run.definitionName}</TableCell>
-                <TableCell>
-                  <StatusIndicator status={run.status} />
-                </TableCell>
-                <TableCell sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>
-                  {run.currentStep ?? "-"}
-                </TableCell>
-                <TableCell sx={{ fontSize: "0.875rem" }}>
-                  {formatElapsedTime(run.elapsedMs)}
-                  {run.isStalled && (
-                    <Typography variant="caption" display="block" color="error" sx={{ mt: 0.5 }}>
-                      Stalled (5+ min waiting)
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Stack direction="row" spacing={1}>
-                    {run.pendingApprovalId && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="success"
-                        startIcon={<CheckCircleIcon />}
-                        onClick={(e) => {
-                          handleApprove(run.pendingApprovalId as string, e);
-                        }}
-                        disabled={approvingApprovalId === run.pendingApprovalId}
-                      >
-                        {approvingApprovalId === run.pendingApprovalId ? "..." : "Approve"}
-                      </Button>
-                    )}
-                    {(run.status === "running" || run.status === "waiting") && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="error"
-                        startIcon={<CancelIcon />}
-                        onClick={(e) => {
-                          handleCancel(run.id, e);
-                        }}
-                        disabled={cancelingRunId === run.id}
-                      >
-                        {cancelingRunId === run.id ? "..." : "Cancel"}
-                      </Button>
-                    )}
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewRun(run.id);
-                      }}
-                    >
-                      View
-                    </Button>
-                  </Stack>
-                </TableCell>
-              </TableRow>
-            ))}
+          {!isLoading && runs.map((run) => (
+            <TableRow
+              key={run.id}
+              sx={{ "&:hover": { backgroundColor: "action.hover" }, cursor: "pointer", backgroundColor: run.isStalled ? "warning.light" : "transparent" }}
+              onClick={() => { onViewRun(run.id); }}
+            >
+              <TableCell>{run.definitionName}</TableCell>
+              <TableCell><StatusIndicator status={run.status} /></TableCell>
+              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>{run.currentStep ?? "-"}</TableCell>
+              <TableCell sx={{ fontSize: "0.875rem" }}>
+                {formatElapsedTime(run.elapsedMs)}
+                {run.isStalled && (
+                  <Typography variant="caption" display="block" color="error" sx={{ mt: 0.5 }}>
+                    Stalled (5+ min waiting)
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell>
+                <FleetRowActions
+                  run={run}
+                  cancelingRunId={cancelingRunId}
+                  approvingApprovalId={approvingApprovalId}
+                  onViewRun={onViewRun}
+                  onCancel={handleCancel}
+                  onApprove={handleApprove}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
     </TableContainer>
@@ -288,19 +277,63 @@ const StatusCounts: React.FC<StatusCountsProps> = ({ counts }) => {
   );
 };
 
+type StatusFilter = "all" | "active" | "waiting" | "failed" | "completed";
+
+function filterRuns(data: FleetDashboardData, filter: StatusFilter): RunSummary[] {
+  const allRuns = [...data.activeRuns, ...data.recentRuns];
+  if (filter === "active") return allRuns.filter((r) => r.status === "running");
+  if (filter === "waiting") return allRuns.filter((r) => r.status === "waiting");
+  if (filter === "failed") return allRuns.filter((r) => r.status === "failed");
+  if (filter === "completed") return allRuns.filter((r) => r.status === "completed");
+  return allRuns;
+}
+
+interface FleetDashboardLoadedProps {
+  data: FleetDashboardData;
+  statusFilter: StatusFilter;
+  onFilterChange: (v: StatusFilter) => void;
+  onCancelRun: (id: string) => Promise<void>;
+  onApproveRun: (id: string) => Promise<void>;
+  onViewRun: (id: string) => void;
+}
+
+const FleetDashboardLoaded: React.FC<FleetDashboardLoadedProps> = ({
+  data, statusFilter, onFilterChange, onCancelRun, onApproveRun, onViewRun
+}) => (
+  <>
+    <StatusCounts counts={data.counts} />
+    <Tabs
+      value={statusFilter}
+      onChange={(e, newValue: StatusFilter) => { onFilterChange(newValue); }}
+      sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
+    >
+      <Tab label="All" value="all" />
+      <Tab label="Active" value="active" />
+      <Tab label="Waiting" value="waiting" />
+      <Tab label="Failed" value="failed" />
+      <Tab label="Completed" value="completed" />
+    </Tabs>
+    <FleetTable
+      runs={filterRuns(data, statusFilter)}
+      onViewRun={onViewRun}
+      onCancelRun={onCancelRun}
+      onApproveRun={onApproveRun}
+    />
+  </>
+);
+
 export const FleetDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState<FleetDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "waiting" | "failed" | "completed">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchDashboard = async (): Promise<void> => {
     try {
       setError(null);
-      const data = await getFleetDashboard();
-      setDashboardData(data);
+      setDashboardData(await getFleetDashboard());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch fleet dashboard");
     } finally {
@@ -310,117 +343,42 @@ export const FleetDashboard: React.FC = () => {
 
   useEffect(() => {
     void fetchDashboard();
-
-    // Poll every 2 seconds
-    pollingIntervalRef.current = setInterval(() => {
-      void fetchDashboard();
-    }, 2000);
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
+    pollingIntervalRef.current = setInterval(() => { void fetchDashboard(); }, 2000);
+    return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current); };
   }, []);
 
   const handleCancelRun = async (runId: string): Promise<void> => {
-    try {
-      await cancelWorkflowRun(runId);
-      await fetchDashboard();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel run");
-    }
+    try { await cancelWorkflowRun(runId); await fetchDashboard(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Failed to cancel run"); }
   };
 
   const handleApproveRun = async (approvalId: string): Promise<void> => {
-    try {
-      await approveWorkflowRun(approvalId);
-      await fetchDashboard();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve run");
-    }
+    try { await approveWorkflowRun(approvalId); await fetchDashboard(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Failed to approve run"); }
   };
-
-  const getFilteredRuns = (): RunSummary[] => {
-    if (!dashboardData) return [];
-
-    const allRuns = [...dashboardData.activeRuns, ...dashboardData.recentRuns];
-
-    switch (statusFilter) {
-      case "active":
-        return allRuns.filter((r) => r.status === "running");
-      case "waiting":
-        return allRuns.filter((r) => r.status === "waiting");
-      case "failed":
-        return allRuns.filter((r) => r.status === "failed");
-      case "completed":
-        return allRuns.filter((r) => r.status === "completed");
-      case "all":
-      default:
-        return allRuns;
-    }
-  };
-
-  const filteredRuns = getFilteredRuns();
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
-
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
         <Typography variant="h4">Fleet Dashboard</Typography>
-        <Button
-          startIcon={<RefreshIcon />}
-          onClick={() => {
-            void fetchDashboard();
-          }}
-          variant="outlined"
-        >
+        <Button startIcon={<RefreshIcon />} onClick={() => { void fetchDashboard(); }} variant="outlined">
           Refresh
         </Button>
       </Box>
-
       {error && <Alert severity="error">{error}</Alert>}
-
       {!loading && dashboardData && (
-        <>
-          <StatusCounts counts={dashboardData.counts} />
-
-          <Tabs
-            value={statusFilter}
-            onChange={(e, newValue) => {
-              setStatusFilter(newValue);
-            }}
-            sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
-          >
-            <Tab label="All" value="all" />
-            <Tab label="Active" value="active" />
-            <Tab label="Waiting" value="waiting" />
-            <Tab label="Failed" value="failed" />
-            <Tab label="Completed" value="completed" />
-          </Tabs>
-
-          <FleetTable
-            runs={filteredRuns}
-            onViewRun={(id) => {
-              navigate(`/runs/${id}`);
-            }}
-            onCancelRun={handleCancelRun}
-            onApproveRun={handleApproveRun}
-            isLoading={loading}
-          />
-        </>
+        <FleetDashboardLoaded
+          data={dashboardData}
+          statusFilter={statusFilter}
+          onFilterChange={setStatusFilter}
+          onCancelRun={handleCancelRun}
+          onApproveRun={handleApproveRun}
+          onViewRun={(id) => { navigate(`/runs/${id}`); }}
+        />
       )}
-
       {loading && !dashboardData && (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-          <CircularProgress />
-        </Box>
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>
       )}
     </Container>
   );
