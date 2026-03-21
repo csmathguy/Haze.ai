@@ -26,7 +26,8 @@ This skill keeps code changes aligned with the repository's local-only privacy r
    ```
    Read only the returned file paths first. Skip this step when the task already names exact files.
 3. Read `references/checklist.md` if the change is more than trivial.
-4. For substantial work, start an audited workflow with `npm run workflow:start implementation "<summary>"`.
+4. For substantial work, the orchestration layer starts a workflow engine run automatically.
+   If triggering manually: `node tools/workflow/start-workflow-run.cjs implementation <WORK_ITEM_ID> "<summary>"`
 5. For nested agent phases such as skill execution, tool invocation, or custom validation passes, use `npm run execution:start` and `npm run execution:end` inside the active workflow.
 6. Identify the boundary being changed: `apps/*/web`, `apps/*/api`, `packages/shared`, or `tools`.
 7. For behavior changes, write or update a failing test first.
@@ -40,11 +41,12 @@ This skill keeps code changes aligned with the repository's local-only privacy r
     ```
     Alternatively use `node tools/runtime/run-npm.cjs run pr:sync -- --summary "<what changed>" --value "<why it matters>" --privacy-confirmed`.
 12. Stop at PR publication. Do not merge the pull request from the implementation workflow.
-13. Close the workflow with `npm run workflow:end implementation success` or `failed`.
+13. The workflow engine marks the run complete automatically. No manual close needed.
+    View run status in the workflow monitor or via `GET /api/workflow/runs/<id>`.
 
 ## Key Rules
 
-- **Never push to main directly.** All changes must be on a feature branch and merged via PR after human review. This is enforced by the workflow engine once PLAN-144 is complete; until then it is a manual discipline rule.
+- **Never push to main directly.** All changes must be on a feature branch and merged via PR after human review. The workflow engine enforces this via the PR approval gate (`phase-5-pr-review`).
 - **Every task must end with an open PR.** An open PR is the definition of done for implementation work. If no PR exists, the work is not done.
 - Do not let frontend code parse raw tax documents.
 - Keep extraction, OCR, and conversion tools behind backend adapters.
