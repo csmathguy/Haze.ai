@@ -18,6 +18,7 @@ async function main(): Promise<void> {
   const options = parseArgs();
 
   writeInfo("Refreshing the Taxes repository and services...");
+  assertCheckoutClean(repositoryRoot);
   await runShortCommand("git fetch", "git", ["fetch", options.remote, options.branch]);
   await runShortCommand("git pull", "git", ["pull", options.remote, options.branch]);
   await runShortCommand("npm install", "node", [
@@ -120,6 +121,32 @@ Options:
   --skip-dev, --skip-de      Only refresh the repository/deps and skip starting services
   --help, -h                 Show this help message
 `);
+}
+
+function assertCheckoutClean(checkoutRoot: string): void {
+  const status = spawnSync("git", ["status", "--short"], {
+    cwd: checkoutRoot,
+    encoding: "utf8",
+    windowsHide: true
+  });
+
+  if (status.error !== undefined) {
+    throw status.error;
+  }
+
+  if (!hasPendingCheckoutChanges(status.stdout)) {
+    return;
+  }
+
+  throw new Error(
+    "repo:refresh requires a clean checkout. " +
+      "The main checkout has local changes or staged files, so refusing to pull. " +
+      "Finish or discard the pending changes first, or run the refresh flow against a clean worktree once support is added."
+  );
+}
+
+export function hasPendingCheckoutChanges(statusOutput: string): boolean {
+  return statusOutput.trim().length > 0;
 }
 
 async function runShortCommand(label: string, command: string, args: string[]): Promise<void> {
