@@ -123,23 +123,25 @@ interface WebhookEventData {
   correlationId?: string;
 }
 
-/**
- * Extract PLAN-XXX reference from branch name.
- * Supports patterns like "feature/plan-123" or "PLAN-123".
- * Returns the plan reference (e.g., "PLAN-123") or undefined.
- */
+const PLAN_REF_PATTERN = /PLAN-(\d+)/i;
+
 function extractPlanReferenceFromBranch(branchName: string | null | undefined): string | undefined {
   if (!branchName) {
     return undefined;
   }
 
-  // Match patterns like "feature/plan-123", "feature/PLAN-123", "PLAN-123"
-  const match = branchName.match(/PLAN-(\d+)/i);
-  if (match) {
-    return `PLAN-${match[1]}`;
+  const match = PLAN_REF_PATTERN.exec(branchName);
+  if (!match) {
+    return undefined;
   }
 
-  return undefined;
+  const planNum = match[1];
+  return planNum !== undefined ? `PLAN-${planNum}` : undefined;
+}
+
+function buildCiCorrelationId(owner: string, repo: string, sha: string, branch: string | null): string {
+  const planRef = extractPlanReferenceFromBranch(branch);
+  return planRef ?? `${owner}/${repo}@${sha}`;
 }
 
 function verifySignature(secret: string, signature: string | undefined, rawBody: string): WebhookVerifyResult {
@@ -167,108 +169,108 @@ function verifySignature(secret: string, signature: string | undefined, rawBody:
   return { valid: true };
 }
 
-function parseGitHubEvent(eventType: string, payload: unknown): WebhookEventData {
-  let workflowEventType = "github.unknown";
-  let correlationId: string | undefined;
-
-  if (eventType === "pull_request") {
-    const parsed = GitHubPullRequestPayloadSchema.safeParse(payload);
-    if (parsed.success) {
-      const { action, pull_request, repository } = parsed.data;
-      workflowEventType = `github.pull_request.${action}`;
-
-      if (pull_request && repository) {
-        const owner = repository.owner.login;
-        const repo = repository.name;
-        const prNumber = String(pull_request.number);
-        correlationId = `${owner}/${repo}#${prNumber}`;
-      }
-    }
-  } else if (eventType === "push") {
-    const parsed = GitHubPushPayloadSchema.safeParse(payload);
-    if (parsed.success) {
-      workflowEventType = "github.push";
-      const { repository } = parsed.data;
-      if (repository) {
-        const owner = repository.owner.login;
-        const repo = repository.name;
-        correlationId = `${owner}/${repo}`;
-      }
-    }
-  } else if (eventType === "workflow_run") {
-    const parsed = GitHubWorkflowRunPayloadSchema.safeParse(payload);
-    if (parsed.success) {
-      const { workflow_run, repository } = parsed.data;
-      const conclusion = workflow_run?.conclusion ?? "unknown";
-      workflowEventType = `github.workflow_run.${conclusion}`;
-
-      if (workflow_run && repository) {
-        const owner = repository.owner.login;
-        const repo = repository.name;
-        const sha = workflow_run.head_sha;
-        const branch = workflow_run.head_branch;
-
-        // Try to correlate by branch if it matches PLAN-XXX pattern
-        const planRef = extractPlanReferenceFromBranch(branch);
-        if (planRef) {
-          correlationId = planRef;
-        } else {
-          // Fall back to commit SHA correlation
-          correlationId = `${owner}/${repo}@${sha}`;
-        }
-      }
-    }
-  } else if (eventType === "check_suite") {
-    const parsed = GitHubCheckSuitePayloadSchema.safeParse(payload);
-    if (parsed.success) {
-      const { check_suite, repository } = parsed.data;
-      const conclusion = check_suite?.conclusion ?? "unknown";
-      workflowEventType = `github.check_suite.${conclusion}`;
-
-      if (check_suite && repository) {
-        const owner = repository.owner.login;
-        const repo = repository.name;
-        const sha = check_suite.head_sha;
-        const branch = check_suite.head_branch;
-
-        // Try to correlate by branch if it matches PLAN-XXX pattern
-        const planRef = extractPlanReferenceFromBranch(branch);
-        if (planRef) {
-          correlationId = planRef;
-        } else {
-          // Fall back to commit SHA correlation
-          correlationId = `${owner}/${repo}@${sha}`;
-        }
-      }
-    }
-  } else if (eventType === "check_run") {
-    const parsed = GitHubCheckRunPayloadSchema.safeParse(payload);
-    if (parsed.success) {
-      const { check_run, repository } = parsed.data;
-      const conclusion = check_run?.conclusion ?? "unknown";
-      workflowEventType = `github.check_run.${conclusion}`;
-
-      if (check_run && repository) {
-        const owner = repository.owner.login;
-        const repo = repository.name;
-        const sha = check_run.head_sha;
-        const branch = check_run.head_branch;
-
-        // Try to correlate by branch if it matches PLAN-XXX pattern
-        const planRef = extractPlanReferenceFromBranch(branch);
-        if (planRef) {
-          correlationId = planRef;
-        } else {
-          // Fall back to commit SHA correlation
-          correlationId = `${owner}/${repo}@${sha}`;
-        }
-      }
-    }
+function parsePullRequestEvent(payload: unknown): WebhookEventData {
+  const parsed = GitHubPullRequestPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { type: "github.unknown" };
   }
 
-  return correlationId
-    ? { type: workflowEventType, correlationId }
-    : { type: workflowEventType };
+  const { action, pull_request, repository } = parsed.data;
+  const type = `github.pull_request.${action}`;
+
+  if (pull_request && repository) {
+    const { login: owner } = repository.owner;
+    const correlationId = `${owner}/${repository.name}#${String(pull_request.number)}`;
+    return { type, correlationId };
+  }
+
+  return { type };
+}
+
+function parsePushEvent(payload: unknown): WebhookEventData {
+  const parsed = GitHubPushPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { type: "github.unknown" };
+  }
+
+  const { repository } = parsed.data;
+  if (repository) {
+    return { type: "github.push", correlationId: `${repository.owner.login}/${repository.name}` };
+  }
+
+  return { type: "github.push" };
+}
+
+function parseWorkflowRunEvent(payload: unknown): WebhookEventData {
+  const parsed = GitHubWorkflowRunPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { type: "github.unknown" };
+  }
+
+  const { workflow_run, repository } = parsed.data;
+  const conclusion = workflow_run?.conclusion ?? "unknown";
+  const type = `github.workflow_run.${conclusion}`;
+
+  if (workflow_run && repository) {
+    const correlationId = buildCiCorrelationId(
+      repository.owner.login, repository.name,
+      workflow_run.head_sha, workflow_run.head_branch
+    );
+    return { type, correlationId };
+  }
+
+  return { type };
+}
+
+function parseCheckSuiteEvent(payload: unknown): WebhookEventData {
+  const parsed = GitHubCheckSuitePayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { type: "github.unknown" };
+  }
+
+  const { check_suite, repository } = parsed.data;
+  const conclusion = check_suite?.conclusion ?? "unknown";
+  const type = `github.check_suite.${conclusion}`;
+
+  if (check_suite && repository) {
+    const correlationId = buildCiCorrelationId(
+      repository.owner.login, repository.name,
+      check_suite.head_sha, check_suite.head_branch
+    );
+    return { type, correlationId };
+  }
+
+  return { type };
+}
+
+function parseCheckRunEvent(payload: unknown): WebhookEventData {
+  const parsed = GitHubCheckRunPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { type: "github.unknown" };
+  }
+
+  const { check_run, repository } = parsed.data;
+  const conclusion = check_run?.conclusion ?? "unknown";
+  const type = `github.check_run.${conclusion}`;
+
+  if (check_run && repository) {
+    const correlationId = buildCiCorrelationId(
+      repository.owner.login, repository.name,
+      check_run.head_sha, check_run.head_branch
+    );
+    return { type, correlationId };
+  }
+
+  return { type };
+}
+
+function parseGitHubEvent(eventType: string, payload: unknown): WebhookEventData {
+  if (eventType === "pull_request") return parsePullRequestEvent(payload);
+  if (eventType === "push") return parsePushEvent(payload);
+  if (eventType === "workflow_run") return parseWorkflowRunEvent(payload);
+  if (eventType === "check_suite") return parseCheckSuiteEvent(payload);
+  if (eventType === "check_run") return parseCheckRunEvent(payload);
+  return { type: "github.unknown" };
 }
 
 async function handleWebhookPayload(
