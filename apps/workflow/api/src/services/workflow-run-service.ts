@@ -8,6 +8,7 @@ import * as workflowDefinitionService from "./workflow-definition-service.js";
 export interface StartRunInput {
   definitionName: string;
   input?: unknown;
+  parentRunId?: string;
 }
 
 export interface SignalRunInput {
@@ -54,6 +55,7 @@ export async function startRun(
       status: effect.nextRun.status,
       currentStep: effect.nextRun.currentStepId ?? null,
       contextJson: JSON.stringify(effect.nextRun.contextJson),
+      parentRunId: data.parentRunId ?? null,
       startedAt: new Date(effect.nextRun.startedAt),
       updatedAt: new Date(effect.nextRun.updatedAt)
     }
@@ -170,31 +172,24 @@ async function applySignalRunEffects(
   runId: string,
   effects: unknown[]
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const typedEffects = effects as Array<{ type: string; [key: string]: unknown }>;
+  const typedEffects = effects as { type: string; [key: string]: unknown }[];
   for (const effect of typedEffects) {
     if (effect.type === "emit-event") {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       await eventBus.emit({
         workflowRunId: runId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         eventType: effect.eventType as string,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         payload: (effect.payload ?? {}) as Record<string, unknown>
       });
     } else if (effect.type === "execute-step") {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       await eventBus.emit({
         workflowRunId: runId,
         eventType: "step.execute-requested",
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         payload: { step: effect.step }
       });
     } else if (effect.type === "create-approval") {
       await eventBus.emit({
         workflowRunId: runId,
         eventType: "approval.created",
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         payload: { stepId: effect.stepId, prompt: effect.prompt }
       });
     }

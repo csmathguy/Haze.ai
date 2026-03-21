@@ -1,16 +1,19 @@
-import type { PrismaClient } from "@taxes/db";
+import type { PrismaClient, WorkflowRun as PrismaWorkflowRun } from "@taxes/db";
 import type { WorkflowDefinition, WorkflowRun, WorkflowRunEffect, WorkflowEffect, ExecuteStepEffect } from "@taxes/shared";
 import { WorkflowEngine } from "@taxes/shared";
 
 import { EventBus } from "./event-bus.js";
 import { checkForWaitForEventMatches, checkForTimedOutWaitingSteps } from "./wait-for-event-handler.js";
+import { resumeParentForCompletedChildren } from "./child-workflow-handler.js";
 import { GitHubPrMergedHandler } from "../services/github-pr-merged-handler.js";
+import { GitHubPrConflictHandler } from "../services/github-pr-conflict-handler.js";
+import * as workflowRunService from "../services/workflow-run-service.js";
 import * as workflowDefinitionService from "../services/workflow-definition-service.js";
 import { StepExecutionHandler } from "../executor/step-execution-handler.js";
 
 /** Internal step-status notification event types that the worker emits for observability only. */
 function isInternalStepNotification(eventType: string): boolean {
-  return eventType === "step.waiting-for-event" || eventType === "step.waiting-for-approval";
+  return eventType === "step.waiting-for-event" || eventType === "step.waiting-for-approval" || eventType === "step.waiting-for-child-workflow";
 }
 
 export interface WorkerConfig {
@@ -70,6 +73,7 @@ export class WorkflowWorker {
   /** Process one batch of pending events — public for testing */
   async processBatch(): Promise<number> {
     await checkForTimedOutWaitingSteps(this.db);
+    await resumeParentForCompletedChildren(this.db);
     const events = await this.eventBus.fetchPending(this.batchSize);
 
     if (events.length === 0) {
@@ -91,9 +95,21 @@ export class WorkflowWorker {
         return;
       }
 
+      // Handle GitHub PR conflict events that trigger conflict-repair workflows
+      if (event.type === "github.pull_request.conflict") {
+        await this.handleGitHubPrConflictEvent(event);
+        return;
+      }
+
       // Handle planning work item status changed events that trigger implementation workflows
       if (event.type === "planning.work_item.status_changed") {
         await this.handlePlanningWorkItemStatusChangedEvent(event);
+        return;
+      }
+
+      // Handle CI failure events (skip/ignore for now — repair workflow PLAN-219 will handle)
+      if (event.type === "github.ci.failed") {
+        await this.eventBus.markProcessed(event.id);
         return;
       }
 
@@ -128,7 +144,7 @@ export class WorkflowWorker {
     }
 
     // Try to match against waiting workflow runs
-    const matched = await checkForWaitForEventMatches(this.db, event.type, eventPayload);
+    const matched = await checkForWaitForEventMatches(this.db, event.type, eventPayload, event.correlationId);
     if (matched) {
       await this.eventBus.markProcessed(event.id);
       return;
@@ -195,7 +211,7 @@ export class WorkflowWorker {
         return;
       }
 
-      const payload = this.parseEventPayload(event.payload);
+      const payload = this.parseEventPayload(event.payload, event.id);
       if (payload === null) return;
 
       const step = payload.step as { id: string; type: string; [key: string]: unknown } | undefined;
@@ -248,6 +264,24 @@ export class WorkflowWorker {
     }
   }
 
+  private async handleGitHubPrConflictEvent(event: { id: string; type: string; payload: string }): Promise<void> {
+    try {
+      const fullEvent = await this.db.workflowEvent.findUnique({
+        where: { id: event.id }
+      });
+
+      if (!fullEvent) {
+        throw new Error(`Event not found: ${event.id}`);
+      }
+
+      const handler = new GitHubPrConflictHandler(this.db);
+      await handler.handleEvent(fullEvent);
+      // Note: handler.handleEvent marks the event as processed
+    } catch (error) {
+      await this.eventBus.markFailed(event.id, `GitHub PR conflict handler error: ${String(error)}`);
+    }
+  }
+
   private async handlePlanningWorkItemStatusChangedEvent(event: { id: string; type: string; correlationId: string | null; payload: string }): Promise<void> {
     try {
       let payload: Record<string, unknown> = {};
@@ -288,16 +322,14 @@ export class WorkflowWorker {
 
       // Start the implementation workflow
       const summary = String(payload.summary) || workItemId;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-      const { run } = await workflowRunService.startRun(this.db, {
+      const startResult: { run: PrismaWorkflowRun } = await workflowRunService.startRun(this.db, {
         definitionName: "implementation",
         input: { workItemId, summary }
       });
 
       // Set the correlation ID to the work item ID
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       await this.db.workflowRun.update({
-        where: { id: run.id as string },
+        where: { id: startResult.run.id },
         data: { correlationId: workItemId }
       });
 
@@ -319,15 +351,6 @@ export class WorkflowWorker {
       return null;
     }
     return parsed;
-  }
-
-  private parseEventPayload(payloadStr: string): Record<string, unknown> | null {
-    try {
-      if (!payloadStr) return {};
-      return JSON.parse(payloadStr) as Record<string, unknown>;
-    } catch {
-      return null;
-    }
   }
 
   private convertRunToSchema(run: { id: string; definitionName: string; version: string; status: string; currentStep: string | null; contextJson: string | null; correlationId: string | null; parentRunId: string | null; startedAt: Date; updatedAt: Date; completedAt: Date | null }) {
@@ -435,6 +458,7 @@ export class WorkflowWorker {
       case "approval":
         return "approval";
       case "wait-for-event":
+      case "child-workflow":
         return "wait";
       case "command":
       case "timer":
