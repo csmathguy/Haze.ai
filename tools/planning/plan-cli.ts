@@ -34,6 +34,7 @@ import {
   getWorkItemById,
   updateAcceptanceCriterionStatus,
   updateTaskStatus,
+  updateWorkItem,
   updateWorkItemAndEmitWorkflowEvent
 } from "../../apps/plan/api/src/services/planning.js";
 import { CODE_REVIEW_SEED_ITEMS } from "./mvp-seed-data.js";
@@ -284,7 +285,6 @@ async function handleWorkItemUpdate(args: string[]): Promise<{ workItem: Awaited
   const workItemId = WorkItemIdSchema.parse(readRequiredFlag(args, "--id"));
   const input = await readJsonFileFlag(args, "--json-file", UpdateWorkItemInputSchema);
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   const workItem = await updateWorkItemAndEmitWorkflowEvent(workItemId, input, {
     workflowDatabaseUrl: WORKFLOW_DATABASE_URL
   });
