@@ -32,8 +32,7 @@ describe("WorkflowEngine", () => {
         label: "Execute command",
         scriptPath: "/path/to/script.sh",
         args: ["--flag"],
-        timeoutMs: 30000,
-        retryPolicy: { maxRetries: 2, backoffMs: 1000 }
+        timeoutMs: 30000
       } as CommandStep
     ]
   };
@@ -125,7 +124,7 @@ describe("WorkflowEngine", () => {
   // ========================================================================
 
   describe("advanceRun", () => {
-    it("transitions to completed on step success", () => {
+    it("transitions to completed on step success when no next step", () => {
       const startResult = engine.startRun(simpleDefinition, {});
       const run = startResult.nextRun;
 
@@ -133,13 +132,13 @@ describe("WorkflowEngine", () => {
         type: "success",
         output: { result: "done" }
       };
-      const advanceResult = engine.advanceRun(run, stepResult);
+      const advanceResult = engine.advanceRun(run, stepResult, simpleDefinition);
 
       expect(advanceResult.nextRun.status).toBe("completed");
       expect(advanceResult.nextRun.completedAt).toBeDefined();
     });
 
-    it("produces complete-run effect on success", () => {
+    it("produces complete-run effect on success when no next step", () => {
       const startResult = engine.startRun(simpleDefinition, {});
       const run = startResult.nextRun;
 
@@ -147,7 +146,7 @@ describe("WorkflowEngine", () => {
         type: "success",
         output: { result: "done" }
       };
-      const advanceResult = engine.advanceRun(run, stepResult);
+      const advanceResult = engine.advanceRun(run, stepResult, simpleDefinition);
 
       expect(advanceResult.effects).toHaveLength(1);
       expect(advanceResult.effects[0]?.type).toBe("complete-run");
@@ -162,7 +161,7 @@ describe("WorkflowEngine", () => {
         type: "success",
         output: stepOutput
       };
-      const advanceResult = engine.advanceRun(run, stepResult);
+      const advanceResult = engine.advanceRun(run, stepResult, simpleDefinition);
 
       const stepId = run.currentStepId ?? "unknown";
       const stepKey = `step_${stepId}`;
@@ -177,7 +176,7 @@ describe("WorkflowEngine", () => {
         type: "failure",
         error: { message: "Command failed", code: "EXEC_ERROR" }
       };
-      const advanceResult = engine.advanceRun(run, stepResult);
+      const advanceResult = engine.advanceRun(run, stepResult, simpleDefinition);
 
       expect(advanceResult.nextRun.status).toBe("failed");
       expect(advanceResult.nextRun.completedAt).toBeDefined();
@@ -191,7 +190,7 @@ describe("WorkflowEngine", () => {
         type: "failure",
         error: { message: "Something went wrong" }
       };
-      const advanceResult = engine.advanceRun(run, stepResult);
+      const advanceResult = engine.advanceRun(run, stepResult, simpleDefinition);
 
       expect(advanceResult.effects).toHaveLength(1);
       expect(advanceResult.effects[0]?.type).toBe("fail-run");
@@ -205,9 +204,8 @@ describe("WorkflowEngine", () => {
       const run = startResult.nextRun;
       const originalUpdatedAt = new Date(run.updatedAt);
 
-      // Small delay to ensure timestamp difference
       const stepResult: StepResult = { type: "success" };
-      const advanceResult = engine.advanceRun(run, stepResult);
+      const advanceResult = engine.advanceRun(run, stepResult, simpleDefinition);
       const newUpdatedAt = new Date(advanceResult.nextRun.updatedAt);
 
       expect(newUpdatedAt.getTime()).toBeGreaterThanOrEqual(originalUpdatedAt.getTime());
@@ -221,7 +219,7 @@ describe("WorkflowEngine", () => {
         type: "success",
         output: { step1Result: "success" }
       };
-      const advanceResult = engine.advanceRun(run, stepResult);
+      const advanceResult = engine.advanceRun(run, stepResult, simpleDefinition);
 
       expect(advanceResult.nextRun.contextJson.input).toEqual({ message: "test" });
     });

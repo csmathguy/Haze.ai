@@ -68,32 +68,29 @@ export class WorkflowEngine {
   /**
    * Advances a workflow run based on a step result.
    * Transitions the run to the next step or terminal state.
+   * Requires the workflow definition to determine step sequencing.
    */
-  advanceRun(run: WorkflowRun, stepResult: StepResult): WorkflowRunEffect {
+  advanceRun(
+    run: WorkflowRun,
+    stepResult: StepResult,
+    definition: WorkflowDefinition
+  ): WorkflowRunEffect {
     const now = new Date().toISOString();
+
+    // Handle step failure with retry logic
+    if (stepResult.type === "failure") {
+      return this.handleStepFailure(run, stepResult, definition, now);
+    }
+
+    // Create next run state with updated timestamp
     const nextRun: WorkflowRun = {
       ...run,
       updatedAt: now
     };
     const effects: WorkflowEffect[] = [];
 
-    // If the step failed, transition to failed state
-    if (stepResult.type === "failure") {
-      nextRun.status = "failed";
-      nextRun.completedAt = now;
-      const failureEffect: WorkflowEffect = {
-        type: "fail-run",
-        error: {
-          message: stepResult.error.message,
-          ...(stepResult.error.code !== undefined && { code: stepResult.error.code })
-        }
-      };
-      effects.push(failureEffect);
-      return { nextRun, effects };
-    }
-
     // Update context with step output
-    if (stepResult.output && run.currentStepId !== undefined) {
+    if (stepResult.output && run.currentStepId) {
       const stepKey = `step_${run.currentStepId}`;
       nextRun.contextJson = {
         ...nextRun.contextJson,
@@ -101,30 +98,190 @@ export class WorkflowEngine {
       };
     }
 
-    // For now, with a linear execution model, mark as completed
-    // (In a more complex state machine with branches, this would advance
-    //  to the next step in the sequence)
-    nextRun.status = "completed";
-    nextRun.completedAt = now;
-    effects.push({
-      type: "complete-run",
-      output: nextRun.contextJson
-    });
+    // Handle condition steps
+    const currentStep = definition.steps.find((s) => s.id === run.currentStepId);
+    if (currentStep?.type === "condition") {
+      const conditionResult = this.handleConditionStep(nextRun, currentStep as never, stepResult);
+      if (conditionResult) {
+        return conditionResult;
+      }
+    }
 
-    return { nextRun, effects };
+    // Advance to next step in sequence
+    return this.advanceToNextStep(nextRun, definition, effects, now);
   }
 
-  /**
-   * Signals a workflow run with an external event.
-   * Used for wait-for-event and approval steps.
-   */
-  signalRun(run: WorkflowRun, event: WorkflowEvent): WorkflowRunEffect {
-    const now = new Date().toISOString();
+  private handleStepFailure(
+    run: WorkflowRun,
+    stepResult: StepResult,
+    definition: WorkflowDefinition,
+    now: string
+  ): WorkflowRunEffect {
     const nextRun: WorkflowRun = {
       ...run,
       updatedAt: now
     };
     const effects: WorkflowEffect[] = [];
+
+    const currentStep = definition.steps.find((s) => s.id === run.currentStepId);
+    const retryPolicy = currentStep && "retryPolicy" in currentStep
+      ? currentStep.retryPolicy
+      : definition.retryPolicy;
+
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    const retryCountKey = `retry_count_${run.currentStepId || "unknown"}`;
+    const currentRetryCount = (nextRun.contextJson[retryCountKey] as number) ?? 0;
+
+    if (retryPolicy && currentRetryCount < retryPolicy.maxRetries) {
+      nextRun.contextJson = {
+        ...nextRun.contextJson,
+        [retryCountKey]: currentRetryCount + 1
+      };
+
+      if (currentStep) {
+        effects.push({
+          type: "execute-step",
+          step: currentStep
+        });
+      }
+
+      return { nextRun, effects };
+    }
+
+    nextRun.status = "failed";
+    nextRun.completedAt = now;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    effects.push({
+      type: "fail-run",
+      error: {
+        message: stepResult.error.message,
+        ...(stepResult.error.code !== undefined && { code: stepResult.error.code })
+      }
+    });
+
+    return { nextRun, effects };
+  }
+
+  private handleConditionStep(
+    run: WorkflowRun,
+    conditionStep: never,
+    stepResult: StepResult
+  ): WorkflowRunEffect | undefined {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const branchResult = stepResult.output?.branch as string | undefined;
+    const currentStepId = run.currentStepId;
+
+    const branchKey = branchResult === "true" ? "trueBranch" : "falseBranch";
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const branch = (conditionStep as Record<string, unknown>)[branchKey] as never[] | undefined;
+
+    if (branch && branch.length > 0) {
+      const firstBranchStep = branch[0] as never;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const stepId = (firstBranchStep as Record<string, unknown>).id as string;
+
+      const nextRun: WorkflowRun = {
+        ...run,
+        currentStepId: stepId,
+        contextJson: {
+          ...run.contextJson,
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          [`condition_${currentStepId}_branch`]: branchResult,
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          [`__pendingSteps_${currentStepId}`]: branch
+        }
+      };
+
+      return {
+        nextRun,
+        effects: [{
+          type: "execute-step",
+          step: firstBranchStep
+        }]
+      };
+    }
+
+    return undefined;
+  }
+
+  private advanceToNextStep(
+    run: WorkflowRun,
+    definition: WorkflowDefinition,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    effects: WorkflowEffect[],
+    now: string
+  ): WorkflowRunEffect {
+    const currentStepIndex = definition.steps.findIndex((s) => s.id === run.currentStepId);
+
+    if (currentStepIndex === -1 || currentStepIndex + 1 >= definition.steps.length) {
+      // No next step - complete the workflow
+      return {
+        nextRun: {
+          ...run,
+          status: "completed",
+          completedAt: now
+        },
+        effects: [{
+          type: "complete-run",
+          output: run.contextJson
+        }]
+      };
+    }
+
+    const nextStep = definition.steps[currentStepIndex + 1];
+
+    if (nextStep?.type === "approval") {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const approvalPrompt = ((nextStep as Record<string, unknown>).prompt as string) ?? "Approval required";
+      return {
+        nextRun: {
+          ...run,
+          currentStepId: nextStep.id,
+          status: "paused"
+        },
+        effects: [{
+          type: "create-approval",
+          stepId: nextStep.id,
+          prompt: approvalPrompt
+        }]
+      };
+    }
+
+    if (nextStep?.type === "parallel") {
+      return this.executeParallelStep(
+        { ...run, currentStepId: nextStep.id },
+        nextStep as ParallelStep
+      );
+    }
+
+    // Normal step - advance to it
+    return {
+      nextRun: {
+        ...run,
+        currentStepId: nextStep.id
+      },
+      effects: [{
+        type: "execute-step",
+        step: nextStep
+      }]
+    };
+  }
+
+  /**
+   * Signals a workflow run with an external event.
+   * Used for wait-for-event and approval steps.
+   * Optionally accepts the workflow definition for approval handling.
+   */
+  signalRun(
+    run: WorkflowRun,
+    event: WorkflowEvent,
+    definition?: WorkflowDefinition
+  ): WorkflowRunEffect {
+    const now = new Date().toISOString();
+    const nextRun: WorkflowRun = {
+      ...run,
+      updatedAt: now
+    };
 
     // Update context with event
     nextRun.contextJson = {
@@ -136,18 +293,121 @@ export class WorkflowEngine {
       }
     };
 
-    // Transition based on event type
-    // On any event, transition to running state
+    // Handle approval.responded event
+    if (event.type === "approval.responded" && definition) {
+      return this.handleApprovalResponse(nextRun, event, definition, now);
+    }
+
+    // Default behavior: emit processed event
     nextRun.status = "running";
+    return {
+      nextRun,
+      effects: [{
+        type: "emit-event",
+        eventType: `${event.type}-processed`,
+        payload: { runId: run.id }
+      }]
+    };
+  }
 
-    const eventType = `${event.type}-processed`;
-    effects.push({
-      type: "emit-event",
-      eventType,
-      payload: { runId: run.id }
-    });
+  private handleApprovalResponse(
+    run: WorkflowRun,
+    event: WorkflowEvent,
+    definition: WorkflowDefinition,
+    now: string
+  ): WorkflowRunEffect {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const decision = event.payload?.decision as string | undefined;
 
-    return { nextRun, effects };
+    if (decision === "rejected") {
+      return {
+        nextRun: {
+          ...run,
+          status: "failed",
+          completedAt: now
+        },
+        effects: [{
+          type: "fail-run",
+          error: {
+            message: "Approval rejected",
+            code: "APPROVAL_REJECTED"
+          }
+        }]
+      };
+    }
+
+    if (decision === "approved") {
+      return this.advanceAfterApproval(run, definition, now);
+    }
+
+    // Fallback for unknown decision
+    return {
+      nextRun: run,
+      effects: []
+    };
+  }
+
+  private advanceAfterApproval(
+    run: WorkflowRun,
+    definition: WorkflowDefinition,
+    now: string
+  ): WorkflowRunEffect {
+    const currentStepIndex = definition.steps.findIndex((s) => s.id === run.currentStepId);
+
+    if (currentStepIndex === -1 || currentStepIndex + 1 >= definition.steps.length) {
+      // No more steps - complete workflow
+      return {
+        nextRun: {
+          ...run,
+          status: "completed",
+          completedAt: now
+        },
+        effects: [{
+          type: "complete-run",
+          output: run.contextJson
+        }]
+      };
+    }
+
+    const nextStep = definition.steps[currentStepIndex + 1];
+
+    if (nextStep?.type === "approval") {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const approvalPrompt = ((nextStep as Record<string, unknown>).prompt as string) ?? "Approval required";
+      return {
+        nextRun: {
+          ...run,
+          currentStepId: nextStep.id,
+          status: "paused"
+        },
+        effects: [{
+          type: "create-approval",
+          stepId: nextStep.id,
+          prompt: approvalPrompt
+        }]
+      };
+    }
+
+    if (nextStep?.type === "parallel") {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      return this.executeParallelStep(
+        { ...run, currentStepId: nextStep.id },
+        nextStep as ParallelStep
+      );
+    }
+
+    // Normal step
+    return {
+      nextRun: {
+        ...run,
+        currentStepId: nextStep.id,
+        status: "running"
+      },
+      effects: [{
+        type: "execute-step",
+        step: nextStep
+      }]
+    };
   }
 
   /**

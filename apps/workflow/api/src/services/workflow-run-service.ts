@@ -131,9 +131,29 @@ export async function signalRun(
     throw new Error("Workflow run not found: " + data.runId);
   }
 
+  // Load the workflow definition from the database
+  const definition = await workflowDefinitionService.getDefinitionByName(
+    prisma,
+    run.definitionName
+  );
+
+  if (!definition) {
+    throw new Error("Workflow definition not found: " + run.definitionName);
+  }
+
+  const definitionJson = JSON.parse(definition.definitionJson) as Record<string, unknown>;
+
+  const workflowDefinition = {
+    name: definition.name,
+    version: definition.version,
+    triggers: JSON.parse(definition.triggerEvents) as string[],
+    inputSchema: {} as never,
+    steps: (definitionJson.steps ?? []) as never[]
+  };
+
   const workflowRun = convertPrismaRunToWorkflowRun(run);
   const engine = new WorkflowEngine();
-  const effect = engine.signalRun(workflowRun, data.event);
+  const effect = engine.signalRun(workflowRun, data.event, workflowDefinition);
 
   const updatedRun = await prisma.workflowRun.update({
     where: { id: data.runId },
@@ -153,6 +173,18 @@ export async function signalRun(
         workflowRunId: data.runId,
         eventType: eff.eventType,
         payload: eff.payload ?? {}
+      });
+    } else if (eff.type === "execute-step") {
+      await eventBus.emit({
+        workflowRunId: data.runId,
+        eventType: "step.execute-requested",
+        payload: { step: eff.step }
+      });
+    } else if (eff.type === "create-approval") {
+      await eventBus.emit({
+        workflowRunId: data.runId,
+        eventType: "approval.created",
+        payload: { stepId: eff.stepId, prompt: eff.prompt }
       });
     }
   }
