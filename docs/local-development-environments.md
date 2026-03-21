@@ -25,6 +25,8 @@ This is an inference from the source set and the current codebase. Official npm 
 
 `npm run repo:refresh` chains `git fetch origin main`, `git pull origin main`, and `npm install` (using the pinned `tools/runtime/run-npm.cjs` helper) before restarting the named environment(s). After install, it runs dependency integrity probes for critical `@mui/material` and `@mui/icons-material` files; if any probe fails, it removes the affected package folder and runs one repair install pass before continuing. By default it launches `--environment all`, which includes the workflow web frontend and the gateway API in addition to the product UIs and APIs. You can pass `--environment`/`--env` multiple times or comma-separated to run a subset, override the branch/remote with `--branch`/`--remote`, or stop before the services start with `--skip-dev`.
 
+If the main checkout is dirty, the refresh helper now looks for a clean worktree and uses that checkout instead of blocking outright. Pass `--checkout main` to force the main checkout or `--checkout current-worktree` when you intentionally want the current worktree to be the target.
+
 After the refresh finishes, the same `npm run dev:env` flow brings every API and web app back online and logs into `.tmp` artifacts; stop the session with `Ctrl+C` just as you would during a manual launch. Run `npm run repo:refresh -- --help` to see the full option set.
 
 The launcher starts from the repository's main checkout even when you invoke it from a worktree. That gives the team one stable target today while preserving a clean seam for future worktree selection.
