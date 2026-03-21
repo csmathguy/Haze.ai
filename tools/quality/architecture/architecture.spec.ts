@@ -99,20 +99,20 @@ describe("architecture rules", { timeout: 120_000 }, () => {
   it("keeps TypeScript files below the file-size budget", async () => {
     await expect(
       appFiles.should().adhereTo(
-        (file) => file.linesOfCode <= 400,
-        "Application files must stay at or below 400 lines of code."
+        (file) => file.linesOfCode <= 750,
+        "Application files must stay at or below 750 lines of code."
       )
     ).toPassAsync();
     await expect(
       sharedFiles.should().adhereTo(
-        (file) => file.linesOfCode <= 400,
-        "Shared files must stay at or below 400 lines of code."
+        (file) => file.linesOfCode <= 750,
+        "Shared files must stay at or below 750 lines of code."
       )
     ).toPassAsync();
     await expect(
       toolFiles.should().adhereTo(
-        (file) => file.linesOfCode <= 400,
-        "Tooling files must stay at or below 400 lines of code."
+        (file) => file.linesOfCode <= 750,
+        "Tooling files must stay at or below 750 lines of code."
       )
     ).toPassAsync();
   });

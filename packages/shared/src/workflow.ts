@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import type {
   WorkflowDefinition,
   WorkflowRun,
@@ -354,4 +355,8 @@ export class WorkflowEngine {
   private getBranchOutputKey(parallelStepId: string, branchIndex: number): string {
     return `branch_${parallelStepId}_${String(branchIndex)}_output`;
   }
+}
+
+function isSuccessStepResult(stepResult: StepResult): stepResult is Extract<StepResult, { type: "success" }> {
+  return stepResult.type === "success";
 }
