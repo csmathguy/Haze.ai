@@ -16,6 +16,7 @@
 - Use `skills/knowledge-agent` when an agent needs to read, write, or synchronize the local knowledge and long-term memory store.
 
 ## Required Workflow
+0. **Run `npm run repo:health` at the start of every session.** This takes 5 seconds and surfaces dirty main checkout, broken junctions, migration conflicts, and packages drift before they cause expensive push failures. Fix any critical issues (✗) before proceeding.
 1. Ensure the work belongs to a planning project in the local plan system. Create the project first when no suitable project exists yet.
 2. Create or refine the planning work item for the task before implementation starts.
 3. Create a dedicated git worktree for the owned slice and do the implementation inside that worktree, not in the shared checkout.
@@ -80,6 +81,12 @@ These three habits prevent the most common sources of wasted tokens and CI failu
    npm run worktree:ensure-junction
    ```
    This verifies the junction health, repairs it if needed, and re-generates the Prisma client.
+
+5. **Run `repo:health` when starting any session — it catches everything at once.**
+   ```bash
+   npm run repo:health
+   ```
+   ✗ Critical issues must be fixed before proceeding. ⚠ Warnings should be reviewed before pushing.
 
 ## Context Management
 
