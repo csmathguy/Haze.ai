@@ -5,6 +5,7 @@ import { WorkflowEngine } from "@taxes/shared";
 import { EventBus } from "./event-bus.js";
 import { GitHubPrMergedHandler } from "../services/github-pr-merged-handler.js";
 import * as workflowDefinitionService from "../services/workflow-definition-service.js";
+import * as workflowRunService from "../services/workflow-run-service.js";
 import { StepExecutionHandler } from "../executor/step-execution-handler.js";
 
 export interface WorkerConfig {
