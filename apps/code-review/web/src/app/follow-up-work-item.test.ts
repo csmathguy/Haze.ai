@@ -12,6 +12,7 @@ const pullRequest: CodeReviewPullRequestDetail = {
   baseRefName: "main",
   body: "## Summary\n- improve review flow",
   checks: [],
+  headSha: "sha-90-follow-up",
   headRefName: "feature/plan-90",
   isDraft: false,
   lanes: [

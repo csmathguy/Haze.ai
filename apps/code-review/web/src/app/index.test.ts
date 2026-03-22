@@ -19,6 +19,7 @@ describe("countPullRequestsByState", () => {
               login: "csmathguy"
             },
             baseRefName: "main",
+            headSha: "sha-29-queue",
             headRefName: "feature/plan-29-pr-workspace",
             isDraft: false,
             number: 29,
@@ -34,6 +35,7 @@ describe("countPullRequestsByState", () => {
               login: "csmathguy"
             },
             baseRefName: "main",
+            headSha: "sha-53-queue",
             headRefName: "feature/plan-53-local-env-runner",
             isDraft: false,
             number: 25,
