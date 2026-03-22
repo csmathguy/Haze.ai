@@ -16,6 +16,13 @@ export interface ReviewEvidenceSection {
   readonly title: string;
 }
 
+export interface ReviewEvidenceArtifactCard {
+  readonly caption: string;
+  readonly href?: string;
+  readonly label: string;
+  readonly location?: string;
+}
+
 export interface ReviewEvidenceSummary {
   readonly detail: string;
   readonly label: string;
@@ -23,7 +30,9 @@ export interface ReviewEvidenceSummary {
 }
 
 export interface ReviewEvidencePresentation {
+  readonly heroArtifacts: readonly ReviewEvidenceArtifactCard[];
   readonly sections: readonly ReviewEvidenceSection[];
+  readonly screenshotCards: readonly ReviewEvidenceArtifactCard[];
   readonly summaries: readonly ReviewEvidenceSummary[];
 }
 
@@ -44,6 +53,7 @@ export function buildReviewEvidencePresentation(pullRequest: CodeReviewPullReque
   ];
 
   return {
+    heroArtifacts: buildHeroArtifacts(artifacts),
     sections: [
       {
         items: buildArtifactItems(artifacts),
@@ -68,6 +78,7 @@ export function buildReviewEvidencePresentation(pullRequest: CodeReviewPullReque
         title: "Missing proof to resolve"
       }
     ],
+    screenshotCards: buildScreenshotCards(artifacts),
     summaries: summaryDefinitions.map((definition) =>
       buildEvidenceSummary(definition, commands, pullRequest.checks, artifacts)
     )
@@ -192,10 +203,36 @@ function buildArtifactLinks(artifacts: readonly CodeReviewEvidenceArtifact[]): r
   );
 }
 
+function buildHeroArtifacts(artifacts: readonly CodeReviewEvidenceArtifact[]): ReviewEvidenceArtifactCard[] {
+  return artifacts
+    .filter((artifact) => artifact.category === "browser" && (artifact.kind === "html-report" || artifact.kind === "trace"))
+    .map((artifact) => ({
+      caption: buildArtifactCaption(artifact),
+      ...(artifact.href === undefined ? {} : { href: artifact.href }),
+      label: artifact.label,
+      ...(artifact.location === undefined ? {} : { location: artifact.location })
+    }));
+}
+
+function buildScreenshotCards(artifacts: readonly CodeReviewEvidenceArtifact[]): ReviewEvidenceArtifactCard[] {
+  return artifacts
+    .filter((artifact) => artifact.kind === "screenshot")
+    .map((artifact) => ({
+      caption: buildArtifactCaption(artifact),
+      ...(artifact.href === undefined ? {} : { href: artifact.href }),
+      label: artifact.label,
+      ...(artifact.location === undefined ? {} : { location: artifact.location })
+    }));
+}
+
 function buildMissingProofItems(pullRequest: CodeReviewPullRequestDetail): string[] {
   const missingEvidence = pullRequest.reviewBrief?.missingEvidence ?? [];
 
   return missingEvidence.length > 0 ? missingEvidence : ["No unresolved proof gaps were recorded in the review brief."];
+}
+
+function buildArtifactCaption(artifact: CodeReviewEvidenceArtifact): string {
+  return [formatArtifactKind(artifact.kind), artifact.status, artifact.location].filter((value) => value !== undefined).join(" | ");
 }
 
 function classifyEvidenceCategory(value: string): CodeReviewEvidenceCategory {
