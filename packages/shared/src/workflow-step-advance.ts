@@ -176,8 +176,57 @@ function buildApprovalPauseEffect(
 }
 
 /**
+ * When a branch step (trueBranch/falseBranch of a condition) completes, its id
+ * is NOT in definition.steps (top-level). We track the branch in context under
+ * `__pendingSteps_<conditionStepId>`. This helper:
+ *  1. Finds which condition owns the completed step.
+ *  2. Advances to the next step in the branch, OR
+ *  3. If the branch is exhausted, resumes the top-level sequence after the condition.
+ */
+function advanceFromBranchStep(
+  run: WorkflowRun,
+  definition: WorkflowDefinition,
+  now: string,
+  executeParallel: ExecuteParallelFn
+): WorkflowRunEffect {
+  const contextKeys = Object.keys(run.contextJson);
+  const pendingKey = contextKeys.find((k) => {
+    if (!k.startsWith("__pendingSteps_")) return false;
+    const steps = run.contextJson[k] as Array<{ id: string }> | undefined;
+    return Array.isArray(steps) && steps.some((s) => s.id === run.currentStepId);
+  });
+
+  if (!pendingKey) {
+    // No branch found — complete the run (shouldn't happen in normal flow)
+    return {
+      nextRun: { ...run, status: "completed", completedAt: now },
+      effects: [{ type: "complete-run", output: run.contextJson }]
+    };
+  }
+
+  const conditionStepId = pendingKey.replace("__pendingSteps_", "");
+  const branchSteps = run.contextJson[pendingKey] as Array<{ id: string }>;
+  const currentIndex = branchSteps.findIndex((s) => s.id === run.currentStepId);
+
+  if (currentIndex + 1 < branchSteps.length) {
+    // More steps in this branch — dispatch the next one
+    const nextBranchStep = branchSteps[currentIndex + 1] as WorkflowDefinition["steps"][number];
+    return {
+      nextRun: { ...run, currentStepId: nextBranchStep.id },
+      effects: [{ type: "execute-step", step: nextBranchStep }]
+    };
+  }
+
+  // Branch exhausted — advance to the next top-level step after the condition
+  const runAtCondition: WorkflowRun = { ...run, currentStepId: conditionStepId };
+  return advanceToNextLinearStep(runAtCondition, definition, now, executeParallel);
+}
+
+/**
  * Advances the run to the next step in the linear definition sequence.
  * Handles ApprovalStep (pauses) and ParallelStep (delegates to executor).
+ * When currentStepId is a branch step (not in top-level definition.steps),
+ * delegates to advanceFromBranchStep to resume the correct sequence.
  */
 export function advanceToNextLinearStep(
   run: WorkflowRun,
@@ -191,7 +240,12 @@ export function advanceToNextLinearStep(
     effects: [{ type: "complete-run", output: run.contextJson }]
   };
 
-  if (currentStepIndex === -1 || currentStepIndex + 1 >= definition.steps.length) {
+  if (currentStepIndex === -1) {
+    // Not a top-level step — must be a branch step inside a condition
+    return advanceFromBranchStep(run, definition, now, executeParallel);
+  }
+
+  if (currentStepIndex + 1 >= definition.steps.length) {
     return completeRun;
   }
 

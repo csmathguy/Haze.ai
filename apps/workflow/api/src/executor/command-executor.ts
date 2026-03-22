@@ -1,10 +1,18 @@
 import { spawn } from "child_process";
 import type { ChildProcess } from "child_process";
 
-/** On Windows, npm/npx/node are installed as .cmd batch files and cannot be directly spawned. */
+/**
+ * On Windows, package manager commands (npm, npx, node, etc.) are installed as .cmd batch
+ * files which cannot be spawned directly — they require shell:true to run via cmd.exe.
+ * We resolve to the .cmd name and set shell:true only for those commands, leaving native
+ * executables (git, etc.) unaffected.
+ */
 const WINDOWS_CMD_COMMANDS = new Set(["npm", "npx", "node", "pnpm", "yarn", "bun"]);
-function resolveCommand(cmd: string): string {
-  return process.platform === "win32" && WINDOWS_CMD_COMMANDS.has(cmd) ? `${cmd}.cmd` : cmd;
+function resolveCommand(cmd: string): { command: string; shell: boolean } {
+  if (process.platform === "win32" && WINDOWS_CMD_COMMANDS.has(cmd)) {
+    return { command: `${cmd}.cmd`, shell: true };
+  }
+  return { command: cmd, shell: false };
 }
 
 export interface CommandStepInput {
@@ -44,10 +52,12 @@ export async function executeCommandStep(
     let stderr = "";
     let exitCode = 0;
 
-    const child: ChildProcess = spawn(resolveCommand(input.command), input.args ?? [], {
+    const { command, shell } = resolveCommand(input.command);
+    const child: ChildProcess = spawn(command, input.args ?? [], {
       cwd,
       env,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
+      shell
     });
 
     const timeoutHandle = setTimeout(() => {
