@@ -66,6 +66,7 @@ describe("createCodeReviewService", () => {
             name: "Zachary Hayes"
           },
           baseRefName: "main",
+          headRefOid: "abcdef1234567890",
           headRefName: "feature/older-open",
           isDraft: false,
           number: 29,
@@ -82,6 +83,7 @@ describe("createCodeReviewService", () => {
             name: "Zachary Hayes"
           },
           baseRefName: "main",
+          headRefOid: "fedcba0987654321",
           headRefName: "feature/newer-merged",
           isDraft: false,
           number: 30,
@@ -121,6 +123,7 @@ describe("createCodeReviewService", () => {
 
     expect(gateway.detailCalls).toBe(2);
     expect(cachedDetail.title).toBe(firstDetail.title);
+    expect(cachedDetail.reviewBrief?.sourceHeadSha).toBe("abcdef1234567890");
   });
 
   it("enriches linked pull request detail with planning and audit evidence", async () => {
@@ -284,6 +287,11 @@ describe("createCodeReviewService", () => {
       ])
     );
     expect(detail.evidenceWarnings).toBeUndefined();
+    expect(detail.reviewBrief).toEqual(
+      expect.objectContaining({
+        sourceHeadSha: "abcdef1234567890"
+      })
+    );
   });
 
   it("raises a refresh error when GitHub fails and no cache exists yet", async () => {
@@ -343,6 +351,7 @@ function createGateway(): GitHubPullRequestGateway & {
             status: "modified" as const
           }
         ],
+        headRefOid: "abcdef1234567890",
         headRefName: "feature/plan-29-pr-cache",
         isDraft: false,
         mergeStateStatus: "CLEAN",
@@ -374,6 +383,7 @@ function createGateway(): GitHubPullRequestGateway & {
             name: "Zachary Hayes"
           },
           baseRefName: "main",
+          headRefOid: "abcdef1234567890",
           headRefName: "feature/plan-29-pr-cache",
           isDraft: false,
           number: 29,

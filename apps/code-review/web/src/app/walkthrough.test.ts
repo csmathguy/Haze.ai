@@ -32,6 +32,7 @@ const pullRequest: CodeReviewPullRequestDetail = {
   baseRefName: "main",
   body: "## Summary\n- Add a walkthrough",
   checks: [],
+  headSha: "sha-32-walkthrough",
   headRefName: "feature/plan-32-walkthrough-diff",
   isDraft: false,
   linkedPlan: {

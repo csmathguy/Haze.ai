@@ -27,6 +27,7 @@ describe("code review app api", () => {
                   login: "csmathguy"
                 },
                 baseRefName: "main",
+                headSha: "abcdef1234567890",
                 headRefName: "feature/plan-53-local-env-runner",
                 isDraft: false,
                 number: 25,
@@ -71,6 +72,7 @@ describe("code review app api", () => {
             baseRefName: "main",
             body: "## Summary\n- Add a local runner",
             checks: [],
+            headSha: "abcdef1234567890",
             headRefName: "feature/plan-53-local-env-runner",
             isDraft: false,
             lanes: [

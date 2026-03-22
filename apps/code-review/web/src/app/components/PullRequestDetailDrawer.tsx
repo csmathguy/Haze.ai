@@ -3,7 +3,8 @@ import { Alert, Box, Divider, Drawer, IconButton, Paper, Stack, Typography, useM
 import { alpha, useTheme } from "@mui/material/styles";
 import type { CodeReviewPullRequestDetail, ReviewLaneId } from "@taxes/shared";
 
-import { PullRequestOverviewPanel } from "./PullRequestOverviewPanel.js";
+import { getWalkthroughStageCopy } from "../walkthrough.js";
+import { ReviewStartPanel } from "./ReviewStartPanel.js";
 import { WalkthroughDeck } from "./WalkthroughDeck.js";
 
 interface PullRequestDetailDrawerProps {
@@ -99,8 +100,8 @@ function PullRequestDetailPanel({
           </Typography>
           <Typography color="text.secondary" variant="body2">
             {pullRequest === null
-              ? "Pick a PR from the queue to start the walkthrough-first review flow."
-              : "The walkthrough is the primary review surface. Use the queue only to switch threads."}
+              ? "Pick one PR from the queue. The page will show you where to start."
+              : "Start at the review brief below, then move one checkpoint at a time."}
           </Typography>
         </Stack>
         <Divider />
@@ -170,7 +171,7 @@ function DrawerContent({
   if (selectedPullRequestNumber === null) {
     return (
       <Alert severity="info">
-        Click a pull request row to open the review drawer and inspect the story, risks, codebase impact, and walkthrough.
+        Choose one pull request from the queue to open the guided review walkthrough.
       </Alert>
     );
   }
@@ -185,7 +186,7 @@ function DrawerContent({
 
   return (
     <Stack spacing={2}>
-      <PullRequestOverviewPanel pullRequest={pullRequest} />
+      <ReviewStartPanel pullRequest={pullRequest} stageTitle={getWalkthroughStageCopy(selectedLaneId).title} />
       <WalkthroughDeck pullRequest={pullRequest} selectedLaneId={selectedLaneId} setSelectedLaneId={setSelectedLaneId} />
     </Stack>
   );
