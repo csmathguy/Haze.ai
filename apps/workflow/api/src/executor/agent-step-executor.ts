@@ -268,27 +268,42 @@ export class AgentStepExecutor {
     const contextPackInfo = contextPack ? `\n\nWork Item Context:
 ${JSON.stringify(contextPack, null, 2)}` : "";
 
+    // Build output schema description for the prompt
+    const outputSchemaStr = step.outputSchema
+      ? JSON.stringify(step.outputSchema, null, 2)
+      : "{}";
+
     // System prompt with agent context
-    const systemPrompt = `You are an agent executing the following step in a workflow.
+    const systemPrompt = `You are an implementation agent executing a bounded task inside a git worktree.
 
 Agent: ${agent.name}
 Step: ${step.label}
-Model: ${step.model}
+
+IMPORTANT RULES:
+1. Make ONLY the code changes needed to complete this task. Do not run tsc, eslint, or any validation — the workflow handles those automatically after you finish.
+2. Do NOT commit or push anything — the workflow handles git commit and PR creation.
+3. You are working in a dedicated git worktree, not the main checkout. Make changes directly to files.
+4. When your implementation is COMPLETE, your FINAL MESSAGE must be ONLY a raw JSON object (no markdown code blocks, no explanation before or after). The JSON must match this schema:
+${outputSchemaStr}
 
 Available Skills:
 ${skillsSection}
 
-Workflow Context:
-${JSON.stringify(run.contextJson, null, 2)}${contextPackInfo}
+Work Item Context:
+${JSON.stringify(contextPack ?? run.contextJson, null, 2)}`;
 
-Please execute the requested tasks and return structured JSON output.`;
+    // User prompt with specific task instructions
+    const userPrompt = `Complete the implementation for step "${step.label}" (step id: ${step.id}).
 
-    // User prompt with step details
-    const userPrompt = `Execute step "${step.label}" (${step.id}).
+After making all code changes, respond with ONLY this JSON object as your final message (replace the placeholder values):
+{
+  "filesChanged": ["list absolute paths of every file you modified or created"],
+  "testsAdded": false,
+  "refactoringApplied": false,
+  "summary": "one sentence describing what you changed and why"
+}
 
-Requested Skills: ${step.skillIds.join(", ")}
-
-Provide your response as JSON matching the output schema. Include reasoning in a "reasoning" field.`;
+Do not include any text before or after the JSON. Do not wrap it in markdown code blocks.`;
 
     // Combine for the full prompt (will be passed to claude -p or codex exec)
     return `${systemPrompt}\n\n---\n\n${userPrompt}`;

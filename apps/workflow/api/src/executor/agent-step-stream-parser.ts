@@ -86,10 +86,22 @@ function applyCompleteMessage(
   // Claude CLI emits the agent's text response as a string in msg.result.
   // If it looks like JSON, parse it so the output schema validator receives an object.
   if (typeof raw === "string") {
+    // Try direct JSON parse first (agent output ONLY JSON as instructed).
     try {
       state.output = JSON.parse(raw);
     } catch {
-      state.output = raw;
+      // Fallback: extract the last {...} block from the response in case the agent
+      // included reasoning text before the JSON.
+      const lastBrace = raw.lastIndexOf("{");
+      if (lastBrace !== -1) {
+        try {
+          state.output = JSON.parse(raw.slice(lastBrace));
+        } catch {
+          state.output = raw;
+        }
+      } else {
+        state.output = raw;
+      }
     }
   } else {
     state.output = raw;
