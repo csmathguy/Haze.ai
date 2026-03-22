@@ -98,10 +98,12 @@ export class AgentStepExecutor {
   ): Promise<StepExecutionEffect> {
     const startTime = Date.now();
 
-    // Load the agent from registry
-    const agent = await db.agent.findUnique({
-      where: { id: step.agentId }
-    });
+    // Load the agent from registry.
+    // agentId in step definitions is the agent's name (e.g. "implementer"), not its cuid.
+    // Try by id first for forward-compat, then fall back to name lookup.
+    const agent =
+      (await db.agent.findUnique({ where: { id: step.agentId } })) ??
+      (await db.agent.findFirst({ where: { name: step.agentId } }));
 
     if (!agent) {
       throw new Error(`Agent not found: ${step.agentId}`);
