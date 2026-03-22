@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type {
   WorkflowDefinition,
-  CommandStep,
   AgentStep,
   ApprovalStep
 } from "@taxes/shared";
@@ -27,7 +26,7 @@ const conflictRepairInputSchema = z.object({
   baseBranch: z.string().min(1).describe("Base branch name (usually main)"),
   headSha: z.string().min(1).describe("Feature branch commit SHA"),
   baseSha: z.string().min(1).describe("Base branch commit SHA"),
-  prUrl: z.string().url().describe("GitHub PR URL"),
+  prUrl: z.url().describe("GitHub PR URL"),
   prBody: z.string().describe("PR description/body")
 });
 
@@ -45,7 +44,7 @@ const contextPackStep: AgentStep = {
     workItemSummary: z.string().describe("Work item summary and acceptance criteria"),
     conflictingFiles: z.array(z.string()).describe("List of files with conflicts"),
     conflictDetails: z.string().describe("Analysis of conflict types and patterns"),
-    contextJson: z.record(z.unknown()).describe("Packed context for repair agent")
+    contextJson: z.record(z.string(), z.unknown()).describe("Packed context for repair agent")
   }),
   timeoutMs: 600000
 };
