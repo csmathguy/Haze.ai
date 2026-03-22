@@ -374,12 +374,12 @@ Provide your response as JSON matching the output schema. Include reasoning in a
       if (process.platform === "win32") {
         return {
           command: "cmd.exe",
-          args: ["/c", "claude.cmd", "-p", prompt, "--output-format", "stream-json", "--dangerously-skip-permissions"]
+          args: ["/c", "claude.cmd", "-p", prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"]
         };
       }
       return {
         command: "claude",
-        args: ["-p", prompt, "--output-format", "stream-json", "--dangerously-skip-permissions"]
+        args: ["-p", prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"]
       };
     }
     if (providerFamily === "openai" && runtimeKind === "codex-subagent") {
