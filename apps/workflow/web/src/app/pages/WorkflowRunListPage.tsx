@@ -52,6 +52,7 @@ const RunsTable: React.FC<RunsTableProps> = ({ runs, onViewRun }) => (
         <TableRow sx={{ backgroundColor: "action.hover" }}>
           <TableCell>ID</TableCell>
           <TableCell>Definition</TableCell>
+          <TableCell>Work Item</TableCell>
           <TableCell>Version</TableCell>
           <TableCell>Status</TableCell>
           <TableCell>Started At</TableCell>
@@ -62,7 +63,7 @@ const RunsTable: React.FC<RunsTableProps> = ({ runs, onViewRun }) => (
       <TableBody>
         {runs.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+            <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
               <Typography color="textSecondary">No runs found</Typography>
             </TableCell>
           </TableRow>
@@ -77,6 +78,7 @@ const RunsTable: React.FC<RunsTableProps> = ({ runs, onViewRun }) => (
                 {run.id.substring(0, 8)}...
               </TableCell>
               <TableCell>{run.definitionName}</TableCell>
+              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>{run.workItemId ?? "-"}</TableCell>
               <TableCell>{run.version}</TableCell>
               <TableCell>
                 <Chip

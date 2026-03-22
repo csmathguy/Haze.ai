@@ -46,6 +46,7 @@ const WorkflowRunSchema = z.object({
   contextJson: z.string().nullable(),
   correlationId: z.string().nullable(),
   parentRunId: z.string().nullable(),
+  workItemId: z.string().nullable().optional(),
   startedAt: z.string(),
   updatedAt: z.string(),
   completedAt: z.string().nullable(),
@@ -188,7 +189,8 @@ const RunSummarySchema = z.object({
   startedAt: z.string(),
   elapsedMs: z.number(),
   isStalled: z.boolean(),
-  pendingApprovalId: z.string().nullable()
+  pendingApprovalId: z.string().nullable(),
+  workItemId: z.string().nullable()
 });
 
 export type RunSummary = z.infer<typeof RunSummarySchema>;

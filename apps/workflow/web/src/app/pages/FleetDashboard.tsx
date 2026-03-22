@@ -156,6 +156,43 @@ interface FleetTableProps {
   isLoading?: boolean;
 }
 
+const FLEET_COL_SPAN = 6;
+
+interface FleetTableBodyProps {
+  approvingApprovalId: string | null;
+  cancelingRunId: string | null;
+  isLoading?: boolean;
+  onApprove: (id: string, e: React.MouseEvent) => void;
+  onCancel: (id: string, e: React.MouseEvent) => void;
+  onCancelRun: (id: string) => Promise<void>;
+  onApproveRun: (approvalId: string) => Promise<void>;
+  onViewRun: (id: string) => void;
+  runs: RunSummary[];
+}
+
+const FleetTableBody: React.FC<FleetTableBodyProps> = ({
+  runs, onViewRun, isLoading, cancelingRunId, approvingApprovalId, onCancel, onApprove
+}) => (
+  <TableBody>
+    {!isLoading && runs.length === 0 && (
+      <TableRow><TableCell colSpan={FLEET_COL_SPAN} align="center" sx={{ py: 4 }}><Typography color="textSecondary">No active workflow runs</Typography></TableCell></TableRow>
+    )}
+    {isLoading && (
+      <TableRow><TableCell colSpan={FLEET_COL_SPAN} align="center" sx={{ py: 4 }}><CircularProgress size={40} /></TableCell></TableRow>
+    )}
+    {!isLoading && runs.map((run) => (
+      <TableRow key={run.id} sx={{ "&:hover": { backgroundColor: "action.hover" }, cursor: "pointer", backgroundColor: run.isStalled ? "warning.light" : "transparent" }} onClick={() => { onViewRun(run.id); }}>
+        <TableCell>{run.definitionName}</TableCell>
+        <TableCell sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>{run.workItemId ?? "-"}</TableCell>
+        <TableCell><StatusIndicator status={run.status} /></TableCell>
+        <TableCell sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>{run.currentStep ?? "-"}</TableCell>
+        <TableCell sx={{ fontSize: "0.875rem" }}>{formatElapsedTime(run.elapsedMs)}{run.isStalled && <Typography variant="caption" display="block" color="error" sx={{ mt: 0.5 }}>Stalled (5+ min waiting)</Typography>}</TableCell>
+        <TableCell><FleetRowActions run={run} cancelingRunId={cancelingRunId} approvingApprovalId={approvingApprovalId} onViewRun={onViewRun} onCancel={onCancel} onApprove={onApprove} /></TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+);
+
 const FleetTable: React.FC<FleetTableProps> = ({ runs, onViewRun, onCancelRun, onApproveRun, isLoading }) => {
   const [cancelingRunId, setCancelingRunId] = useState<string | null>(null);
   const [approvingApprovalId, setApprovingApprovalId] = useState<string | null>(null);
@@ -178,57 +215,14 @@ const FleetTable: React.FC<FleetTableProps> = ({ runs, onViewRun, onCancelRun, o
         <TableHead>
           <TableRow sx={{ backgroundColor: "action.hover" }}>
             <TableCell>Definition</TableCell>
+            <TableCell>Work Item</TableCell>
             <TableCell>Status</TableCell>
             <TableCell>Current Step</TableCell>
             <TableCell>Elapsed</TableCell>
             <TableCell>Actions</TableCell>
           </TableRow>
         </TableHead>
-        <TableBody>
-          {!isLoading && runs.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                <Typography color="textSecondary">No active workflow runs</Typography>
-              </TableCell>
-            </TableRow>
-          )}
-          {isLoading && (
-            <TableRow>
-              <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                <CircularProgress size={40} />
-              </TableCell>
-            </TableRow>
-          )}
-          {!isLoading && runs.map((run) => (
-            <TableRow
-              key={run.id}
-              sx={{ "&:hover": { backgroundColor: "action.hover" }, cursor: "pointer", backgroundColor: run.isStalled ? "warning.light" : "transparent" }}
-              onClick={() => { onViewRun(run.id); }}
-            >
-              <TableCell>{run.definitionName}</TableCell>
-              <TableCell><StatusIndicator status={run.status} /></TableCell>
-              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.875rem" }}>{run.currentStep ?? "-"}</TableCell>
-              <TableCell sx={{ fontSize: "0.875rem" }}>
-                {formatElapsedTime(run.elapsedMs)}
-                {run.isStalled && (
-                  <Typography variant="caption" display="block" color="error" sx={{ mt: 0.5 }}>
-                    Stalled (5+ min waiting)
-                  </Typography>
-                )}
-              </TableCell>
-              <TableCell>
-                <FleetRowActions
-                  run={run}
-                  cancelingRunId={cancelingRunId}
-                  approvingApprovalId={approvingApprovalId}
-                  onViewRun={onViewRun}
-                  onCancel={handleCancel}
-                  onApprove={handleApprove}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
+        <FleetTableBody runs={runs} onViewRun={onViewRun} onCancelRun={onCancelRun} onApproveRun={onApproveRun} {...(isLoading !== undefined ? { isLoading } : {})} cancelingRunId={cancelingRunId} approvingApprovalId={approvingApprovalId} onCancel={handleCancel} onApprove={handleApprove} />
       </Table>
     </TableContainer>
   );
