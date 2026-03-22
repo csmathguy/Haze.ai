@@ -71,6 +71,33 @@ export async function startPlanningSession(idea: string, projectKey?: string): P
   return response.json() as Promise<StartPlanningSessionResult>;
 }
 
+export interface StartImplementationRunResult {
+  runId: string;
+}
+
+export async function startImplementationRun(workItemId: string): Promise<StartImplementationRunResult> {
+  const response = await fetch("/api/workflow/runs", {
+    body: JSON.stringify({
+      definitionName: "implementation",
+      input: { workItemId }
+    }),
+    headers: {
+      "Content-Type": "application/json"
+    },
+    method: "POST"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to start implementation run (${response.status.toString()}).`);
+  }
+
+  const data = await response.json() as { run?: { id: string } };
+  if (!data.run) {
+    throw new Error("No run returned from implementation workflow start");
+  }
+  return { runId: data.run.id };
+}
+
 async function sendJsonRequest(url: string, method: "PATCH" | "POST", body: unknown): Promise<void> {
   const response = await fetch(url, {
     body: JSON.stringify(body),

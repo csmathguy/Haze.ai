@@ -12,6 +12,7 @@ interface PlanningWorkspaceStateProps {
   readonly handleCreateWorkItem: (input: CreateWorkItemDraftInput) => Promise<boolean>;
   readonly handleCriterionToggle: (criterionId: string, checked: boolean) => Promise<void>;
   readonly handlePlanningSessionStarted: (runId: string) => void;
+  readonly handleStartImplementation: (workItemId: string) => Promise<void>;
   readonly handleStatusChange: (status: WorkItemStatus) => Promise<void>;
   readonly handleTaskToggle: (taskId: string, checked: boolean) => Promise<void>;
   readonly isBusy: boolean;
@@ -29,6 +30,7 @@ export function PlanningWorkspaceState({
   handleCreateWorkItem,
   handleCriterionToggle,
   handlePlanningSessionStarted,
+  handleStartImplementation,
   handleStatusChange,
   handleTaskToggle,
   isBusy,
@@ -71,6 +73,7 @@ export function PlanningWorkspaceState({
       handleCreateWorkItem={handleCreateWorkItem}
       handleCriterionToggle={handleCriterionToggle}
       handlePlanningSessionStarted={handlePlanningSessionStarted}
+      handleStartImplementation={handleStartImplementation}
       handleStatusChange={handleStatusChange}
       handleTaskToggle={handleTaskToggle}
       isCreateDrawerOpen={isCreateDrawerOpen}
@@ -102,6 +105,7 @@ function PlanningWorkspaceReadyState({
   handleCreateWorkItem,
   handleCriterionToggle,
   handlePlanningSessionStarted,
+  handleStartImplementation,
   handleStatusChange,
   handleTaskToggle,
   isCreateDrawerOpen,
@@ -150,6 +154,7 @@ function PlanningWorkspaceReadyState({
       />
       <PlanningWorkspaceBody
         handleCriterionToggle={handleCriterionToggle}
+        handleStartImplementation={handleStartImplementation}
         handleStatusChange={handleStatusChange}
         handleTaskToggle={handleTaskToggle}
         isDetailDrawerOpen={isDetailDrawerOpen}
@@ -165,6 +170,7 @@ function PlanningWorkspaceReadyState({
 
 interface PlanningWorkspaceBodyProps {
   readonly handleCriterionToggle: (criterionId: string, checked: boolean) => Promise<void>;
+  readonly handleStartImplementation: (workItemId: string) => Promise<void>;
   readonly handleStatusChange: (status: WorkItemStatus) => Promise<void>;
   readonly handleTaskToggle: (taskId: string, checked: boolean) => Promise<void>;
   readonly isDetailDrawerOpen: boolean;
@@ -177,6 +183,7 @@ interface PlanningWorkspaceBodyProps {
 
 function PlanningWorkspaceBody({
   handleCriterionToggle,
+  handleStartImplementation,
   handleStatusChange,
   handleTaskToggle,
   isDetailDrawerOpen,
@@ -201,6 +208,7 @@ function PlanningWorkspaceBody({
             setIsDetailDrawerOpen(false);
           }}
           onCriterionToggle={handleCriterionToggle}
+          onStartImplementation={handleStartImplementation}
           onStatusChange={handleStatusChange}
           onTaskToggle={handleTaskToggle}
         open={isDetailDrawerOpen}

@@ -12,6 +12,7 @@ import type { CreateWorkItemDraftInput, PlanningWorkspace, WorkItemStatus } from
 import {
   createPlanningWorkItem,
   fetchPlanningWorkspace,
+  startImplementationRun,
   updatePlanningAcceptanceCriterionStatus,
   updatePlanningTaskStatus,
   updatePlanningWorkItem
@@ -34,7 +35,8 @@ export function App() {
     setSelectedWorkItemId,
     successMessage,
     visibleWorkItems,
-    workspace
+    workspace,
+    handleStartImplementation
   } = usePlanningWorkspaceController();
 
   return (
@@ -43,6 +45,7 @@ export function App() {
       handleCreateWorkItem={handleCreateWorkItem}
       handleCriterionToggle={handleCriterionToggle}
       handlePlanningSessionStarted={handlePlanningSessionStarted}
+      handleStartImplementation={handleStartImplementation}
       handleStatusChange={handleStatusChange}
       handleTaskToggle={handleTaskToggle}
       isBusy={isBusy}
@@ -98,6 +101,7 @@ function usePlanningWorkspaceController() {
   const {
     handleCreateWorkItem,
     handleCriterionToggle,
+    handleStartImplementation,
     handleStatusChange,
     handleTaskToggle
   } = usePlanningActions({
@@ -116,6 +120,7 @@ function usePlanningWorkspaceController() {
     handleCreateWorkItem,
     handleCriterionToggle,
     handlePlanningSessionStarted,
+    handleStartImplementation,
     handleStatusChange,
     handleTaskToggle,
     isBusy,
@@ -156,6 +161,26 @@ interface PlanningActionsOptions {
   readonly selectedWorkItemId: string | null;
   readonly setErrorMessage: (message: string | null) => void;
   readonly setSuccessMessage: (message: string | null) => void;
+}
+
+function makeStartImplementationHandler(
+  setErrorMessage: (message: string | null) => void,
+  setSuccessMessage: (message: string | null) => void
+) {
+  return async (workItemId: string): Promise<void> => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const result = await startImplementationRun(workItemId);
+      const msg = `Implementation run started (${result.runId}). Open the workflow app to follow along.`;
+      setSuccessMessage(msg);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Failed to start implementation run.";
+      setErrorMessage(errMsg);
+      throw err;
+    }
+  };
 }
 
 function usePlanningActions({
@@ -234,6 +259,7 @@ function usePlanningActions({
   return {
     handleCreateWorkItem,
     handleCriterionToggle,
+    handleStartImplementation: makeStartImplementationHandler(setErrorMessage, setSuccessMessage),
     handleStatusChange,
     handleTaskToggle
   };
@@ -265,6 +291,7 @@ interface PlanningPageLayoutProps {
   readonly handleCreateWorkItem: (input: CreateWorkItemDraftInput) => Promise<boolean>;
   readonly handleCriterionToggle: (criterionId: string, checked: boolean) => Promise<void>;
   readonly handlePlanningSessionStarted: (runId: string) => void;
+  readonly handleStartImplementation: (workItemId: string) => Promise<void>;
   readonly handleStatusChange: (status: WorkItemStatus) => Promise<void>;
   readonly handleTaskToggle: (taskId: string, checked: boolean) => Promise<void>;
   readonly isBusy: boolean;
@@ -283,6 +310,7 @@ function PlanningPageLayout({
   handleCreateWorkItem,
   handleCriterionToggle,
   handlePlanningSessionStarted,
+  handleStartImplementation,
   handleStatusChange,
   handleTaskToggle,
   isBusy,
@@ -317,6 +345,7 @@ function PlanningPageLayout({
             handleCreateWorkItem={handleCreateWorkItem}
             handleCriterionToggle={handleCriterionToggle}
             handlePlanningSessionStarted={handlePlanningSessionStarted}
+            handleStartImplementation={handleStartImplementation}
             handleStatusChange={handleStatusChange}
             handleTaskToggle={handleTaskToggle}
             isBusy={isBusy}
