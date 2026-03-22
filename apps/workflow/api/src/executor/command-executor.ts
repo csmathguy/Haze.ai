@@ -7,7 +7,9 @@ import type { ChildProcess } from "child_process";
  * We resolve to the .cmd name and set shell:true only for those commands, leaving native
  * executables (git, etc.) unaffected.
  */
-const WINDOWS_CMD_COMMANDS = new Set(["npm", "npx", "node", "pnpm", "yarn", "bun"]);
+// "node" is intentionally excluded — it ships as node.exe (a native binary), not a .cmd wrapper.
+// Only package-manager launcher scripts that are .cmd files need shell:true.
+const WINDOWS_CMD_COMMANDS = new Set(["npm", "npx", "pnpm", "yarn", "bun"]);
 function resolveCommand(cmd: string): { command: string; shell: boolean } {
   if (process.platform === "win32" && WINDOWS_CMD_COMMANDS.has(cmd)) {
     return { command: `${cmd}.cmd`, shell: true };
