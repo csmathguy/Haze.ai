@@ -1,7 +1,9 @@
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
-import { Button, Chip, Divider, Stack, Typography } from "@mui/material";
+import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
+import PreviewOutlinedIcon from "@mui/icons-material/PreviewOutlined";
+import { Button, Chip, Divider, Paper, Stack, Typography } from "@mui/material";
 
-import type { ReviewEvidencePresentation, ReviewEvidenceSummary } from "../review-evidence.js";
+import type { ReviewEvidenceArtifactCard, ReviewEvidencePresentation, ReviewEvidenceSummary } from "../review-evidence.js";
 
 interface ReviewEvidencePanelProps {
   readonly presentation: ReviewEvidencePresentation;
@@ -18,9 +20,29 @@ export function ReviewEvidencePanel({ presentation }: ReviewEvidencePanelProps) 
           ))}
         </Stack>
       </Stack>
+      {presentation.heroArtifacts.length === 0 ? null : (
+        <Stack spacing={1}>
+          <Typography variant="subtitle2">Review these browser artifacts first</Typography>
+          <Stack direction={{ sm: "row", xs: "column" }} gap={1.25}>
+            {presentation.heroArtifacts.map((artifact) => (
+              <ArtifactCard icon={<PreviewOutlinedIcon fontSize="small" />} key={`hero-${artifact.label}`} artifact={artifact} />
+            ))}
+          </Stack>
+        </Stack>
+      )}
+      {presentation.screenshotCards.length === 0 ? null : (
+        <Stack spacing={1}>
+          <Typography variant="subtitle2">Visual confirmation</Typography>
+          <Stack direction={{ sm: "row", xs: "column" }} gap={1.25}>
+            {presentation.screenshotCards.map((artifact) => (
+              <ArtifactCard icon={<ImageOutlinedIcon fontSize="small" />} key={`shot-${artifact.label}`} artifact={artifact} />
+            ))}
+          </Stack>
+        </Stack>
+      )}
       {presentation.sections.map((section, index) => (
         <Stack key={section.title} spacing={1.25}>
-          {index === 0 ? null : <Divider />}
+          {index === 0 && presentation.heroArtifacts.length === 0 && presentation.screenshotCards.length === 0 ? null : <Divider />}
           <Typography variant="subtitle2">{section.title}</Typography>
           {section.items.map((item) => (
             <Typography color="text.secondary" key={`${section.title}-${item}`} variant="body2">
@@ -45,6 +67,47 @@ export function ReviewEvidencePanel({ presentation }: ReviewEvidencePanelProps) 
         </Stack>
       ))}
     </Stack>
+  );
+}
+
+function ArtifactCard({
+  artifact,
+  icon
+}: {
+  readonly artifact: ReviewEvidenceArtifactCard;
+  readonly icon: React.ReactNode;
+}) {
+  return (
+    <Paper sx={{ minWidth: 0, p: 1.5 }} variant="outlined">
+      <Stack spacing={1}>
+        <Stack alignItems="center" direction="row" gap={0.75}>
+          {icon}
+          <Typography variant="subtitle2">{artifact.label}</Typography>
+        </Stack>
+        <Typography color="text.secondary" variant="body2">
+          {artifact.caption}
+        </Typography>
+        {artifact.location === undefined ? null : (
+          <Typography color="text.secondary" variant="caption">
+            {artifact.location}
+          </Typography>
+        )}
+        {artifact.href === undefined ? null : (
+          <Button
+            component="a"
+            endIcon={<OpenInNewOutlinedIcon />}
+            href={artifact.href}
+            rel="noreferrer"
+            size="small"
+            sx={{ alignSelf: "flex-start" }}
+            target="_blank"
+            variant="outlined"
+          >
+            Open artifact
+          </Button>
+        )}
+      </Stack>
+    </Paper>
   );
 }
 

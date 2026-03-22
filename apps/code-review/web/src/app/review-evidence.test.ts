@@ -145,6 +145,20 @@ const pullRequest: CodeReviewPullRequestDetail = {
 describe("buildReviewEvidencePresentation", () => {
   it("builds compact evidence summaries and detail sections from PR evidence", () => {
     expect(buildReviewEvidencePresentation(pullRequest)).toEqual({
+      heroArtifacts: [
+        {
+          caption: "html report | created",
+          href: "https://example.test/playwright-report/index.html",
+          label: "Playwright HTML report"
+        }
+      ],
+      screenshotCards: [
+        {
+          caption: "screenshot | created | artifacts/e2e/dashboard.png",
+          label: "Dashboard screenshot",
+          location: "artifacts/e2e/dashboard.png"
+        }
+      ],
       summaries: [
         {
           detail: "No unit-test evidence is attached yet.",
