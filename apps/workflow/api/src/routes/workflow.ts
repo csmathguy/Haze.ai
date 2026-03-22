@@ -138,7 +138,8 @@ function registerRunSummaryRoute(app: FastifyInstance, databaseUrl?: string): vo
           startedAt: run.startedAt.toISOString(),
           elapsedMs: now.getTime() - new Date(run.startedAt).getTime(),
           isStalled,
-          pendingApprovalId: pendingApproval?.id ?? null
+          pendingApprovalId: pendingApproval?.id ?? null,
+          workItemId: run.workItemId ?? null
         };
       };
 
