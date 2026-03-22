@@ -12,24 +12,28 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const GATEWAY_PORT = 3000;
 const WORKFLOW_WEB_PORT = 5179;
 
+function getListeningPidsWin32(port: number): number[] {
+  const output = execFileSync("netstat", ["-ano"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    windowsHide: true
+  });
+  const pids: number[] = [];
+  for (const row of output.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
+    const cols = row.split(/\s+/);
+    const [proto, localAddr, , state, pidStr] = cols;
+    if (proto !== "TCP" || state !== "LISTENING" || !localAddr || !pidStr) continue;
+    if (localAddr.split(":").at(-1) !== port.toString()) continue;
+    const pid = Number.parseInt(pidStr, 10);
+    if (!Number.isNaN(pid) && pid !== process.pid) pids.push(pid);
+  }
+  return pids;
+}
+
 function getListeningPids(port: number): number[] {
   if (process.platform === "win32") {
-    const output = execFileSync("netstat", ["-ano"], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-      windowsHide: true
-    });
-    const pids: number[] = [];
-    for (const row of output.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
-      const cols = row.split(/\s+/);
-      const [proto, localAddr, , state, pidStr] = cols;
-      if (proto !== "TCP" || state !== "LISTENING" || !localAddr || !pidStr) continue;
-      if (localAddr.split(":").at(-1) !== port.toString()) continue;
-      const pid = Number.parseInt(pidStr, 10);
-      if (!Number.isNaN(pid) && pid !== process.pid) pids.push(pid);
-    }
-    return pids;
+    return getListeningPidsWin32(port);
   }
   // POSIX
   try {
@@ -52,18 +56,18 @@ function stopPort(port: number): void {
       } else {
         process.kill(pid, "SIGTERM");
       }
-      console.log(`Stopped PID ${pid.toString()} on port ${port.toString()}.`);
+      console.warn(`Stopped PID ${pid.toString()} on port ${port.toString()}.`);
     } catch {
       // Process may have already exited
     }
   }
 }
 
-console.log("Stopping gateway and workflow-web services...");
+console.warn("Stopping gateway and workflow-web services...");
 stopPort(GATEWAY_PORT);
 stopPort(WORKFLOW_WEB_PORT);
 
-console.log("Starting gateway and workflow-web services...");
+console.warn("Starting gateway and workflow-web services...");
 const child = spawn(
   process.execPath,
   [

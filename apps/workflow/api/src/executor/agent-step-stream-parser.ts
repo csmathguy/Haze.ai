@@ -78,6 +78,21 @@ function processStreamLines(
   }
 }
 
+/** Parse a string result from the CLI — try direct JSON, then extract last `{...}` block. */
+function parseStringOutput(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const lastBrace = raw.lastIndexOf("{");
+    if (lastBrace === -1) return raw;
+    try {
+      return JSON.parse(raw.slice(lastBrace));
+    } catch {
+      return raw;
+    }
+  }
+}
+
 function applyCompleteMessage(
   msg: Record<string, unknown>,
   state: { output: unknown; tokenUsage?: TokenUsage; durationMs?: number; reasoning: string }
@@ -86,23 +101,7 @@ function applyCompleteMessage(
   // Claude CLI emits the agent's text response as a string in msg.result.
   // If it looks like JSON, parse it so the output schema validator receives an object.
   if (typeof raw === "string") {
-    // Try direct JSON parse first (agent output ONLY JSON as instructed).
-    try {
-      state.output = JSON.parse(raw);
-    } catch {
-      // Fallback: extract the last {...} block from the response in case the agent
-      // included reasoning text before the JSON.
-      const lastBrace = raw.lastIndexOf("{");
-      if (lastBrace !== -1) {
-        try {
-          state.output = JSON.parse(raw.slice(lastBrace));
-        } catch {
-          state.output = raw;
-        }
-      } else {
-        state.output = raw;
-      }
-    }
+    state.output = parseStringOutput(raw);
   } else {
     state.output = raw;
   }

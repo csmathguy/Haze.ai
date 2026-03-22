@@ -18,13 +18,18 @@ export type ExecuteParallelFn = (run: WorkflowRun, step: ParallelStep) => Workfl
 
 // -- handleStepFailure helpers (split to stay under complexity limit) ----------
 
+interface RetryEffectOptions {
+  retryCountKey: string;
+  currentRetryCount: number;
+  currentStep: WorkflowDefinition["steps"][number] | undefined;
+  failureReason?: string;
+}
+
 function buildRetryEffect(
   nextRun: WorkflowRun,
-  retryCountKey: string,
-  currentRetryCount: number,
-  currentStep: WorkflowDefinition["steps"][number] | undefined,
-  failureReason?: string
+  opts: RetryEffectOptions
 ): WorkflowRunEffect {
+  const { retryCountKey, currentRetryCount, currentStep, failureReason } = opts;
   // Store the failure reason under retry_error_<stepId> so the next attempt can see it.
   const errorKey = retryCountKey.replace("retry_count_", "retry_error_");
   const updatedRun = {
@@ -120,7 +125,7 @@ export function handleStepFailure(
 
   if (retryPolicy && currentRetryCount < retryPolicy.maxRetries) {
     const failureReason = stepResult.type === "failure" ? stepResult.error.message : undefined;
-    return buildRetryEffect(nextRun, retryCountKey, currentRetryCount, currentStep, failureReason);
+    return buildRetryEffect(nextRun, { retryCountKey, currentRetryCount, currentStep, failureReason });
   }
 
   return buildFailEffect(nextRun, now, stepResult);
