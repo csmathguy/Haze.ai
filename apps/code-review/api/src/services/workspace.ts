@@ -8,6 +8,7 @@ import { createFileCodeReviewCacheStore, type CodeReviewCacheStore } from "./pul
 import { buildAgentReview } from "./agent-review.js";
 import { toAuditEvidence, toPlanningWorkItem } from "./pull-request-evidence.js";
 import { toPullRequestDetail, toPullRequestSummary, toRepository } from "./pull-request-review.js";
+import { buildReviewBrief } from "./review-brief.js";
 
 interface CacheEntry<TValue> {
   readonly cachedAt: string;
@@ -96,18 +97,16 @@ async function enrichPullRequestDetail(
   planningGateway: PlanningWorkItemGateway,
   auditGateway: AuditWorkItemGateway
 ): Promise<CodeReviewPullRequestDetail> {
-  if (detail.linkedPlan === undefined) {
-    return detail;
-  }
-
-  const workItemId = detail.linkedPlan.workItemId;
-  const [planningResult, auditResult] = await Promise.allSettled([
-    planningGateway.getWorkItem(workItemId),
-    auditGateway.getWorkItemTimeline(workItemId)
-  ]);
   const evidenceWarnings: string[] = [];
-  const planningWorkItem = resolvePlanningWorkItem(detail, planningResult, evidenceWarnings);
-  const auditEvidence = resolveAuditEvidence(workItemId, auditResult, evidenceWarnings);
+  const enrichmentInputs = await loadDetailEnrichmentInputs(detail, planningGateway, auditGateway);
+  const planningWorkItem =
+    enrichmentInputs.planningResult === undefined
+      ? undefined
+      : resolvePlanningWorkItem(detail, enrichmentInputs.planningResult, evidenceWarnings);
+  const auditEvidence =
+    enrichmentInputs.workItemId === undefined || enrichmentInputs.auditResult === undefined
+      ? undefined
+      : resolveAuditEvidence(enrichmentInputs.workItemId, enrichmentInputs.auditResult, evidenceWarnings);
   const agentReview = buildAgentReview(
     {
       ...detail,
@@ -116,13 +115,43 @@ async function enrichPullRequestDetail(
     },
     detail.updatedAt
   );
-
-  return {
+  const enrichedDetail = {
     ...detail,
     ...(agentReview === undefined ? {} : { agentReview }),
     ...(auditEvidence === undefined ? {} : { auditEvidence }),
     ...(evidenceWarnings.length === 0 ? {} : { evidenceWarnings }),
     ...(planningWorkItem === undefined ? {} : { planningWorkItem })
+  };
+
+  return {
+    ...enrichedDetail,
+    reviewBrief: buildReviewBrief(enrichedDetail, detail.updatedAt)
+  };
+}
+
+async function loadDetailEnrichmentInputs(
+  detail: CodeReviewPullRequestDetail,
+  planningGateway: PlanningWorkItemGateway,
+  auditGateway: AuditWorkItemGateway
+): Promise<{
+  readonly auditResult?: PromiseSettledResult<Awaited<ReturnType<AuditWorkItemGateway["getWorkItemTimeline"]>>>;
+  readonly planningResult?: PromiseSettledResult<Awaited<ReturnType<PlanningWorkItemGateway["getWorkItem"]>>>;
+  readonly workItemId?: string;
+}> {
+  if (detail.linkedPlan === undefined) {
+    return {};
+  }
+
+  const workItemId = detail.linkedPlan.workItemId;
+  const [planningResult, auditResult] = await Promise.allSettled([
+    planningGateway.getWorkItem(workItemId),
+    auditGateway.getWorkItemTimeline(workItemId)
+  ]);
+
+  return {
+    auditResult,
+    planningResult,
+    workItemId
   };
 }
 

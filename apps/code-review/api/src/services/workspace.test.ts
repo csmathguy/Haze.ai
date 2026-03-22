@@ -123,6 +123,7 @@ describe("createCodeReviewService", () => {
 
     expect(gateway.detailCalls).toBe(2);
     expect(cachedDetail.title).toBe(firstDetail.title);
+    expect(cachedDetail.reviewBrief?.sourceHeadSha).toBe("abcdef1234567890");
   });
 
   it("enriches linked pull request detail with planning and audit evidence", async () => {
@@ -286,6 +287,11 @@ describe("createCodeReviewService", () => {
       ])
     );
     expect(detail.evidenceWarnings).toBeUndefined();
+    expect(detail.reviewBrief).toEqual(
+      expect.objectContaining({
+        sourceHeadSha: "abcdef1234567890"
+      })
+    );
   });
 
   it("raises a refresh error when GitHub fails and no cache exists yet", async () => {
