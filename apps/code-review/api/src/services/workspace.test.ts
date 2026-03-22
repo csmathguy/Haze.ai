@@ -66,6 +66,7 @@ describe("createCodeReviewService", () => {
             name: "Zachary Hayes"
           },
           baseRefName: "main",
+          headRefOid: "abcdef1234567890",
           headRefName: "feature/older-open",
           isDraft: false,
           number: 29,
@@ -82,6 +83,7 @@ describe("createCodeReviewService", () => {
             name: "Zachary Hayes"
           },
           baseRefName: "main",
+          headRefOid: "fedcba0987654321",
           headRefName: "feature/newer-merged",
           isDraft: false,
           number: 30,
@@ -343,6 +345,7 @@ function createGateway(): GitHubPullRequestGateway & {
             status: "modified" as const
           }
         ],
+        headRefOid: "abcdef1234567890",
         headRefName: "feature/plan-29-pr-cache",
         isDraft: false,
         mergeStateStatus: "CLEAN",
@@ -374,6 +377,7 @@ function createGateway(): GitHubPullRequestGateway & {
             name: "Zachary Hayes"
           },
           baseRefName: "main",
+          headRefOid: "abcdef1234567890",
           headRefName: "feature/plan-29-pr-cache",
           isDraft: false,
           number: 29,
