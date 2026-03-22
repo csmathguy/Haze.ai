@@ -1,6 +1,12 @@
 import { spawn } from "child_process";
 import type { ChildProcess } from "child_process";
 
+/** On Windows, npm/npx/node are installed as .cmd batch files and cannot be directly spawned. */
+const WINDOWS_CMD_COMMANDS = new Set(["npm", "npx", "node", "pnpm", "yarn", "bun"]);
+function resolveCommand(cmd: string): string {
+  return process.platform === "win32" && WINDOWS_CMD_COMMANDS.has(cmd) ? `${cmd}.cmd` : cmd;
+}
+
 export interface CommandStepInput {
   readonly stepId: string;
   readonly command: string;
@@ -38,7 +44,7 @@ export async function executeCommandStep(
     let stderr = "";
     let exitCode = 0;
 
-    const child: ChildProcess = spawn(input.command, input.args ?? [], {
+    const child: ChildProcess = spawn(resolveCommand(input.command), input.args ?? [], {
       cwd,
       env,
       stdio: ["ignore", "pipe", "pipe"]

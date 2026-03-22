@@ -29,7 +29,14 @@ import { applyCaptureStdoutKey } from "./capture-stdout.js";
 
 /** A step from the execute-step effect — typed loosely since it may come from JSON. */
 interface StepLike { type: string; id: string; [key: string]: unknown }
-
+interface StepNode { id: string; condition?: unknown; trueBranch?: StepNode[]; falseBranch?: StepNode[]; branches?: StepNode[][] }
+function findStepInDefinition(steps: StepNode[], id: string): StepNode | undefined {
+  for (const step of steps) {
+    if (step.id === id) return step;
+    for (const b of [step.trueBranch ?? [], step.falseBranch ?? [], ...(step.branches ?? [])]) { const f = findStepInDefinition(b, id); if (f) return f; }
+  }
+  return undefined;
+}
 /**
  * Interpolates {{input.workItemId}} style context variables into a string value.
  * Supports dot-notation paths within contextJson.
@@ -201,8 +208,7 @@ export class StepExecutionHandler {
     let stepResult: StepResult;
 
     try {
-      // condition function may not be present if definition was deserialized from JSON
-      const conditionFn = step.condition as ((ctx: Record<string, unknown>) => boolean) | undefined;
+      const conditionFn = (typeof step.condition === "function" ? step.condition : findStepInDefinition(definition.steps as StepNode[], step.id)?.condition) as ((ctx: Record<string, unknown>) => boolean) | undefined;
       if (typeof conditionFn !== "function") {
         // Condition can't be evaluated — default to true branch
         await recordStepFailed(this.db, stepRun.id, "Condition function not available (serialized definition)");
