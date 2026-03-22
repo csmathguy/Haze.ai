@@ -6,6 +6,9 @@
  * side-effectful CommandExecutor / AgentStepExecutor / ConditionStepExecutor.
  */
 
+import { fileURLToPath } from "url";
+import { resolve, dirname } from "path";
+
 import type { PrismaClient } from "@taxes/db";
 import type {
   WorkflowDefinition,
@@ -14,6 +17,14 @@ import type {
   StepResult
 } from "@taxes/shared";
 import { WorkflowEngine } from "@taxes/shared";
+
+/**
+ * Repo root resolved from this file's location.
+ * This file is at apps/workflow/api/src/executor — repo root is 5 levels up.
+ * Used as the default cwd for command steps so npm scripts resolve correctly
+ * regardless of which workspace directory the gateway process starts from.
+ */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 
 import { executeCommandStep } from "./command-executor.js";
 import { AgentStepExecutor, type StepExecutionEffect } from "./agent-step-executor.js";
@@ -159,8 +170,8 @@ export class StepExecutionHandler {
         stepId: step.id,
         command: step.scriptPath as string,
         args,
-        ...(timeoutMs !== undefined && { timeoutMs }),
-        ...(worktreePath !== undefined && { cwd: worktreePath })
+        cwd: worktreePath ?? REPO_ROOT,
+        ...(timeoutMs !== undefined && { timeoutMs })
       });
 
       await recordStepComplete(this.db, stepRun.id, commandResult);
