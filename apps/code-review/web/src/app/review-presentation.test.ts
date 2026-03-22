@@ -22,6 +22,7 @@ const pullRequest: CodeReviewPullRequestDetail = {
   baseRefName: "main",
   body: "## Summary\n- redesign walkthrough",
   checks: [],
+  headSha: "sha-90-presentation",
   headRefName: "feature/plan-90",
   isDraft: false,
   lanes: [

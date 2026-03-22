@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-const LIST_FIELDS = ["number", "title", "state", "isDraft", "headRefName", "baseRefName", "author", "updatedAt", "url", "reviewDecision"].join(",");
+const LIST_FIELDS = ["number", "title", "state", "isDraft", "headRefName", "headRefOid", "baseRefName", "author", "updatedAt", "url", "reviewDecision"].join(",");
 const DETAIL_FIELDS = [
   "number",
   "title",
@@ -10,6 +10,7 @@ const DETAIL_FIELDS = [
   "state",
   "isDraft",
   "headRefName",
+  "headRefOid",
   "baseRefName",
   "author",
   "updatedAt",
@@ -31,6 +32,7 @@ export interface GitHubPullRequestActor {
 export interface GitHubPullRequestListEntry {
   readonly author: GitHubPullRequestActor;
   readonly baseRefName: string;
+  readonly headRefOid: string;
   readonly headRefName: string;
   readonly isDraft: boolean;
   readonly number: number;

@@ -42,6 +42,7 @@ const pullRequest: CodeReviewPullRequestDetail = {
       workflowName: "CI"
     }
   ],
+  headSha: "sha-90-evidence",
   headRefName: "feature/plan-90",
   isDraft: false,
   lanes: [

@@ -19,10 +19,10 @@ export interface CodeReviewCacheStore {
 export function createFileCodeReviewCacheStore(cacheRoot: string, now: () => Date = () => new Date()): CodeReviewCacheStore {
   return {
     readPullRequestDetail: async (pullRequestNumber) =>
-      readCacheFile(path.join(cacheRoot, "pull-requests", `${pullRequestNumber.toString()}.json`), CodeReviewPullRequestDetailSchema),
+      readCacheFile(path.join(cacheRoot, "pull-requests", pullRequestNumber.toString(), "latest.json"), CodeReviewPullRequestDetailSchema),
     readWorkspace: async () => readCacheFile(path.join(cacheRoot, "workspace.json"), CodeReviewWorkspaceSchema),
     writePullRequestDetail: async (pullRequestNumber, detail) =>
-      writeCacheFile(path.join(cacheRoot, "pull-requests", `${pullRequestNumber.toString()}.json`), detail, now),
+      writePullRequestDetailCache(cacheRoot, pullRequestNumber, detail, now),
     writeWorkspace: async (workspace) => writeCacheFile(path.join(cacheRoot, "workspace.json"), workspace, now)
   };
 }
@@ -66,6 +66,20 @@ async function writeCacheFile(filePath: string, value: unknown, now: () => Date)
     )}\n`,
     "utf8"
   );
+}
+
+async function writePullRequestDetailCache(
+  cacheRoot: string,
+  pullRequestNumber: number,
+  detail: CodeReviewPullRequestDetail,
+  now: () => Date
+): Promise<void> {
+  const pullRequestDirectory = path.join(cacheRoot, "pull-requests", pullRequestNumber.toString());
+  const versionedFilePath = path.join(pullRequestDirectory, `${detail.headSha}.json`);
+  const latestFilePath = path.join(pullRequestDirectory, "latest.json");
+
+  await writeCacheFile(versionedFilePath, detail, now);
+  await writeCacheFile(latestFilePath, detail, now);
 }
 
 function isMissingFileError(error: unknown): boolean {

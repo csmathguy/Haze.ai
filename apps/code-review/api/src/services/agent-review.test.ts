@@ -11,6 +11,7 @@ const baseDetail: CodeReviewPullRequestDetail = {
   baseRefName: "main",
   body: "## Summary\n- improve review",
   checks: [],
+  headSha: "abcdef1234567890",
   headRefName: "feature/no-plan",
   isDraft: false,
   lanes: [

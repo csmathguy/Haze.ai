@@ -18,6 +18,7 @@ const fakeService = {
             name: "Zachary Hayes"
           },
           baseRefName: "main",
+          headSha: "abcdef1234567890",
           headRefName: "feature/plan-53-local-env-runner",
           isDraft: false,
           linkedPlan: {
@@ -61,6 +62,7 @@ const fakeService = {
           workflowName: "CI"
         }
       ],
+      headSha: "abcdef1234567890",
       headRefName: "feature/plan-53-local-env-runner",
       isDraft: false,
       linkedPlan: {

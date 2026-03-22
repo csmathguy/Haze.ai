@@ -14,6 +14,7 @@ export function toPullRequestSummary(pullRequest: GitHubPullRequestListEntry): C
   return {
     author: toActor(pullRequest.author),
     baseRefName: pullRequest.baseRefName,
+    headSha: pullRequest.headRefOid,
     headRefName: pullRequest.headRefName,
     isDraft: pullRequest.isDraft,
     ...(linkedPlan === undefined ? {} : { linkedPlan }),
@@ -47,6 +48,7 @@ export function toPullRequestDetail(
       status: check.status,
       ...(check.workflowName === undefined ? {} : { workflowName: check.workflowName })
     })),
+    headSha: pullRequest.headRefOid,
     headRefName: pullRequest.headRefName,
     isDraft: pullRequest.isDraft,
     ...(linkedPlan === undefined ? {} : { linkedPlan }),

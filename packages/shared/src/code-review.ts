@@ -120,6 +120,17 @@ export const CodeReviewAgentReviewSchema = z.object({
   summary: z.string().min(1)
 });
 
+export const CodeReviewReviewBriefSchema = z.object({
+  followUpCandidates: z.array(z.string().min(1)),
+  generatedAt: z.iso.datetime(),
+  inspectFirst: z.array(z.string().min(1)),
+  missingEvidence: z.array(z.string().min(1)),
+  sourceHeadSha: z.string().min(7),
+  startHere: z.array(z.string().min(1)).min(1),
+  summary: z.string().min(1),
+  whatThisPrDoes: z.array(z.string().min(1)).min(1)
+});
+
 export const CodeReviewFileExplanationSchema = z.object({
   rationale: z.string().min(1),
   reviewFocus: z.array(z.string().min(1)).min(1),
@@ -175,6 +186,7 @@ export const CodeReviewPullRequestStatsSchema = z.object({
 export const CodeReviewPullRequestSummarySchema = z.object({
   author: CodeReviewActorSchema,
   baseRefName: z.string().min(1),
+  headSha: z.string().min(7),
   headRefName: z.string().min(1),
   isDraft: z.boolean(),
   linkedPlan: CodeReviewPlanContextSchema.optional(),
@@ -196,6 +208,7 @@ export const CodeReviewPullRequestDetailSchema = CodeReviewPullRequestSummarySch
   mergeStateStatus: z.string().min(1),
   narrative: CodeReviewNarrativeSchema,
   planningWorkItem: CodeReviewLinkedWorkItemSchema.optional(),
+  reviewBrief: CodeReviewReviewBriefSchema.optional(),
   stats: CodeReviewPullRequestStatsSchema,
   trustStatement: z.string().min(1)
 });
@@ -236,6 +249,7 @@ export type CodeReviewPullRequestState = z.infer<typeof CodeReviewPullRequestSta
 export type CodeReviewPullRequestStats = z.infer<typeof CodeReviewPullRequestStatsSchema>;
 export type CodeReviewPullRequestSummary = z.infer<typeof CodeReviewPullRequestSummarySchema>;
 export type CodeReviewRepository = z.infer<typeof CodeReviewRepositorySchema>;
+export type CodeReviewReviewBrief = z.infer<typeof CodeReviewReviewBriefSchema>;
 export type CodeReviewWorkspace = z.infer<typeof CodeReviewWorkspaceSchema>;
 export type ReviewLane = z.infer<typeof ReviewLaneSchema>;
 export type ReviewLaneId = z.infer<typeof ReviewLaneIdSchema>;

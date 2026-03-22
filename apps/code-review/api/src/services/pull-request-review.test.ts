@@ -121,6 +121,7 @@ function createPullRequestDetail() {
           status: "modified"
         }
       ],
+      headRefOid: "abcdef1234567890",
       headRefName: "feature/plan-29-pr-workspace",
       isDraft: false,
       mergeStateStatus: "CLEAN",

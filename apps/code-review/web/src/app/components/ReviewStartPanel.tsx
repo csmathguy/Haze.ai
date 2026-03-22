@@ -1,11 +1,12 @@
 import ExpandMoreOutlinedIcon from "@mui/icons-material/ExpandMoreOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
-import { Accordion, AccordionDetails, AccordionSummary, Alert, Button, Chip, Paper, Stack, Typography } from "@mui/material";
+import type { ReactNode } from "react";
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Button, Paper, Stack, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 import type { CodeReviewPullRequestDetail } from "@taxes/shared";
 
-import { buildReviewOverviewPresentation } from "../review-presentation.js";
-import { PullRequestOverviewPanel } from "./PullRequestOverviewPanel.js";
+import { buildReviewBriefPresentation } from "../review-brief-presentation.js";
 
 interface ReviewStartPanelProps {
   readonly pullRequest: CodeReviewPullRequestDetail;
@@ -13,28 +14,51 @@ interface ReviewStartPanelProps {
 }
 
 export function ReviewStartPanel({ pullRequest, stageTitle }: ReviewStartPanelProps) {
-  const presentation = buildReviewOverviewPresentation(pullRequest);
+  const presentation = buildReviewBriefPresentation(pullRequest, stageTitle);
 
   return (
-    <Paper sx={{ p: 2.5 }} variant="outlined">
+    <Paper
+      sx={(theme) => ({
+        background: `linear-gradient(180deg, ${alpha(theme.palette.secondary.main, 0.06)}, ${theme.palette.background.paper})`,
+        p: 2.5
+      })}
+      variant="outlined"
+    >
       <Stack spacing={2}>
-        <Stack spacing={1}>
-          <Typography variant="subtitle2">Start Here</Typography>
-          <Typography variant="h3">{presentation.heroTitle}</Typography>
+        <Stack spacing={0.75}>
+          <Typography variant="subtitle2">Start here</Typography>
+          <Typography variant="h3">{presentation.title}</Typography>
           <Typography color="text.secondary" variant="body2">
-            Begin with the current step below. You do not need to understand the whole PR at once.
+            {presentation.summary}
+          </Typography>
+          <Typography color="text.secondary" variant="body2">
+            Status: {presentation.statusLabel}
           </Typography>
         </Stack>
 
-        <Stack direction="row" flexWrap="wrap" gap={1}>
-          <Chip label={`Current step: ${stageTitle}`} size="small" variant="outlined" />
-          <Chip label="Start with context, then move one checkpoint at a time" size="small" variant="outlined" />
-          {pullRequest.linkedPlan === undefined ? <Chip color="warning" label="Plan link missing" size="small" variant="outlined" /> : null}
-        </Stack>
+        <Paper
+          sx={(theme) => ({
+            backgroundColor: alpha(theme.palette.background.default, 0.7),
+            p: 1.75
+          })}
+          variant="outlined"
+        >
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Do this next</Typography>
+            {presentation.startHere.map((item, index) => (
+              <Typography key={item} variant="body2">
+                {(index + 1).toString()}. {item}
+              </Typography>
+            ))}
+            <Typography color="text.secondary" variant="body2">
+              Current checkpoint: {presentation.nextStepTitle}
+            </Typography>
+          </Stack>
+        </Paper>
 
         <Stack direction={{ sm: "row", xs: "column" }} spacing={1}>
-          <Button component="a" endIcon={<OpenInNewOutlinedIcon />} href={pullRequest.url} rel="noreferrer" target="_blank" variant="outlined">
-            Open on GitHub
+          <Button component="a" endIcon={<OpenInNewOutlinedIcon />} href={pullRequest.url} rel="noreferrer" target="_blank" variant="contained">
+            Open PR on GitHub
           </Button>
           {pullRequest.linkedPlan === undefined ? null : (
             <Button
@@ -51,23 +75,60 @@ export function ReviewStartPanel({ pullRequest, stageTitle }: ReviewStartPanelPr
         </Stack>
 
         {pullRequest.linkedPlan === undefined ? (
-          <Alert severity="warning">This review is easier to trust when the PR is linked back to a planning work item.</Alert>
+          <Alert severity="warning">Link this PR to a planning work item before final approval so the reviewer can verify intent.</Alert>
         ) : null}
 
-        <Accordion disableGutters>
-          <AccordionSummary expandIcon={<ExpandMoreOutlinedIcon />}>
-            <Stack spacing={0.25}>
-              <Typography variant="subtitle2">Review Background</Typography>
-              <Typography color="text.secondary" variant="body2">
-                Open this only if you need the broader PR summary before starting the walkthrough.
-              </Typography>
-            </Stack>
-          </AccordionSummary>
-          <AccordionDetails sx={{ px: 0, pb: 0 }}>
-            <PullRequestOverviewPanel pullRequest={pullRequest} />
-          </AccordionDetails>
-        </Accordion>
+        <OptionalSection
+          description="Only open this if you need more context before moving into the walkthrough."
+          title="Need more context?"
+        >
+          <Stack spacing={1.5}>
+            <BulletSection items={presentation.whatThisPrDoes} title="What this PR does" />
+            <BulletSection items={presentation.inspectFirst} title="Inspect first" />
+            {presentation.missingEvidence.length > 0 ? <BulletSection items={presentation.missingEvidence} title="Missing evidence" /> : null}
+            <BulletSection items={presentation.contextSummary} title="Review context" />
+          </Stack>
+        </OptionalSection>
       </Stack>
     </Paper>
+  );
+}
+
+function OptionalSection({
+  children,
+  description,
+  title
+}: {
+  readonly children: ReactNode;
+  readonly description: string;
+  readonly title: string;
+}) {
+  return (
+    <Accordion disableGutters>
+      <AccordionSummary expandIcon={<ExpandMoreOutlinedIcon />}>
+        <Stack spacing={0.25}>
+          <Typography variant="subtitle2">{title}</Typography>
+          <Typography color="text.secondary" variant="body2">
+            {description}
+          </Typography>
+        </Stack>
+      </AccordionSummary>
+      <AccordionDetails sx={{ pt: 0 }}>
+        {children}
+      </AccordionDetails>
+    </Accordion>
+  );
+}
+
+function BulletSection({ items, title }: { readonly items: string[]; readonly title: string }) {
+  return (
+    <Stack spacing={0.75}>
+      <Typography variant="subtitle2">{title}</Typography>
+      {items.map((item) => (
+        <Typography key={`${title}-${item}`} variant="body2">
+          {item}
+        </Typography>
+      ))}
+    </Stack>
   );
 }

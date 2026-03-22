@@ -43,6 +43,7 @@ const pullRequest: CodeReviewPullRequestDetail = {
       workflowName: "CI"
     }
   ],
+  headSha: "sha-65-story",
   headRefName: "feature/plan-65-code-review-trust-gate",
   isDraft: false,
   lanes: [
