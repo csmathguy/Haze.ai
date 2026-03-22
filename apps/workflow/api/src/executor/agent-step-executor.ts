@@ -293,6 +293,17 @@ export class AgentStepExecutor {
       ? `\n\nPREVIOUS ATTEMPT FAILED WITH THIS ERROR — fix it this time:\n${previousErrorStr}`
       : "";
 
+    // Format just the task-relevant fields for the prompt (exclude gitDiff to avoid misleading the agent)
+    const taskContext = contextPack
+      ? {
+          workItemId: contextPack.workItemId,
+          workItemTitle: contextPack.workItemTitle,
+          workItemSummary: contextPack.workItemSummary,
+          acceptanceCriteria: contextPack.acceptanceCriteria,
+          tasks: contextPack.tasks
+        }
+      : run.contextJson;
+
     // System prompt with agent context
     const systemPrompt = `You are an implementation agent executing a bounded task inside a git worktree.
 
@@ -302,7 +313,7 @@ Step: ${step.label}
 IMPORTANT RULES:
 1. Make ONLY the code changes needed to complete this task. Do not run tsc, eslint, or any validation — the workflow handles those automatically after you finish.
 2. Do NOT commit or push anything — the workflow handles git commit and PR creation.
-3. You are working in a dedicated git worktree, not the main checkout. Make changes directly to files.
+3. You are working in a dedicated git worktree. Any existing commits on this branch are infrastructure changes NOT related to your task. Your task has NOT been implemented yet — determine what to implement from the workItemSummary and tasks fields below.
 4. When your implementation is COMPLETE, your FINAL MESSAGE must be ONLY a raw JSON object (no markdown code blocks, no explanation before or after). The JSON must match this schema:
 ${outputSchemaStr}
 
@@ -310,7 +321,7 @@ Available Skills:
 ${skillsSection}
 
 Work Item Context:
-${JSON.stringify(contextPack ?? run.contextJson, null, 2)}${previousErrorSection}`;
+${JSON.stringify(taskContext, null, 2)}${previousErrorSection}`;
 
     // User prompt with specific task instructions
     const userPrompt = `Complete the implementation for step "${step.label}" (step id: ${step.id}).
