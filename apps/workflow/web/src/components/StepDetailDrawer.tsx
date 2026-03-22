@@ -206,53 +206,75 @@ interface StepDefinitionSectionProps {
   step: WorkflowStep;
 }
 
-const StepDefinitionSection: React.FC<StepDefinitionSectionProps> = ({ step }) => {
+const StepAgentSection: React.FC<{ step: WorkflowStep }> = ({ step }) => {
+  if (!step.agentId) return null;
   return (
-    <Stack spacing={2}>
+    <>
+      <Box>
+        <Typography variant="overline" color="textSecondary">Agent</Typography>
+        <Typography variant="body2">{step.agentId}</Typography>
+      </Box>
+      {step.model && (
+        <Box>
+          <Typography variant="overline" color="textSecondary">Model</Typography>
+          <Typography variant="body2">{step.model}</Typography>
+        </Box>
+      )}
+      {step.skillIds && step.skillIds.length > 0 && (
+        <Box>
+          <Typography variant="overline" color="textSecondary">Skills</Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {step.skillIds.map((skill) => (
+              <Chip key={skill} label={skill} size="small" variant="outlined" />
+            ))}
+          </Box>
+        </Box>
+      )}
+    </>
+  );
+};
+
+const StepBranchSection: React.FC<{ step: WorkflowStep }> = ({ step }) => {
+  if (step.trueBranch === undefined && step.falseBranch === undefined) return null;
+  return (
+    <Box>
+      <Typography variant="overline" color="textSecondary">Condition Branches</Typography>
+      <Stack spacing={1}>
+        {step.trueBranch && (
+          <Box sx={{ p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="textSecondary">true → </Typography>
+            <Typography variant="body2">{step.trueBranch.map((s) => s.id).join(", ") || "(empty)"}</Typography>
+          </Box>
+        )}
+        {step.falseBranch && (
+          <Box sx={{ p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
+            <Typography variant="caption" color="textSecondary">false → </Typography>
+            <Typography variant="body2">{step.falseBranch.map((s) => s.id).join(", ") || "(empty)"}</Typography>
+          </Box>
+        )}
+      </Stack>
+    </Box>
+  );
+};
+
+const StepDefinitionSection: React.FC<StepDefinitionSectionProps> = ({ step }) => (
+  <Stack spacing={2}>
     <Box>
       <Typography variant="overline" color="textSecondary">Label</Typography>
       <Typography variant="body2">{step.label}</Typography>
     </Box>
-
     <Box>
       <Typography variant="overline" color="textSecondary">Type</Typography>
       <Chip label={step.type} size="small" />
     </Box>
-
     <StepCommandSection step={step} />
-
-    {step.agentName && (
-      <>
-        <Box>
-          <Typography variant="overline" color="textSecondary">Agent Name</Typography>
-          <Typography variant="body2">{step.agentName}</Typography>
-        </Box>
-        {step.model && (
-          <Box>
-            <Typography variant="overline" color="textSecondary">Model</Typography>
-            <Typography variant="body2">{step.model}</Typography>
-          </Box>
-        )}
-        {step.skills && step.skills.length > 0 && (
-          <Box>
-            <Typography variant="overline" color="textSecondary">Skills</Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {step.skills.map((skill) => (
-                <Chip key={skill} label={skill} size="small" variant="outlined" />
-              ))}
-            </Box>
-          </Box>
-        )}
-      </>
-    )}
-
-    {step.timeout && (
+    <StepAgentSection step={step} />
+    {step.timeoutMs && (
       <Box>
         <Typography variant="overline" color="textSecondary">Timeout (ms)</Typography>
-        <Typography variant="body2">{step.timeout}</Typography>
+        <Typography variant="body2">{step.timeoutMs}</Typography>
       </Box>
     )}
-
     {step.retryPolicy && (
       <Box>
         <Typography variant="overline" color="textSecondary">Retry Policy</Typography>
@@ -261,23 +283,9 @@ const StepDefinitionSection: React.FC<StepDefinitionSectionProps> = ({ step }) =
         </Typography>
       </Box>
     )}
-
-    {step.branches && Object.keys(step.branches).length > 0 && (
-      <Box>
-        <Typography variant="overline" color="textSecondary">Condition Branches</Typography>
-        <Stack spacing={1}>
-          {Object.entries(step.branches).map(([condition, targetId]) => (
-            <Box key={condition} sx={{ p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
-              <Typography variant="caption" color="textSecondary">{condition} →</Typography>
-              <Typography variant="body2">{targetId}</Typography>
-            </Box>
-          ))}
-        </Stack>
-      </Box>
-    )}
-    </Stack>
-  );
-};
+    <StepBranchSection step={step} />
+  </Stack>
+);
 
 export const StepDetailDrawer: React.FC<StepDetailDrawerProps> = ({
   open,

@@ -10,6 +10,14 @@ import { GitHubPrConflictHandler } from "../services/github-pr-conflict-handler.
 import * as workflowRunService from "../services/workflow-run-service.js";
 import * as workflowDefinitionService from "../services/workflow-definition-service.js";
 import { StepExecutionHandler } from "../executor/step-execution-handler.js";
+import { implementationWorkflow, conflictRepairWorkflow, planningWorkflow } from "../definitions/index.js";
+
+/** In-memory registry of TypeScript workflow definitions (includes JS functions like conditions). */
+const DEFINITION_REGISTRY = new Map<string, WorkflowDefinition>([
+  [implementationWorkflow.name, implementationWorkflow],
+  [conflictRepairWorkflow.name, conflictRepairWorkflow],
+  [planningWorkflow.name, planningWorkflow],
+]);
 
 /** Internal step-status notification event types that the worker emits for observability only. */
 function isInternalStepNotification(eventType: string): boolean {
@@ -179,31 +187,11 @@ export class WorkflowWorker {
       return;
     }
 
-    // Load the workflow definition from the database
-    const definition = await workflowDefinitionService.getDefinitionByName(
-      this.db,
-      run.definitionName
-    );
-
     const runData = this.convertRunToSchema(run);
     const workflowEvent = { type: event.type, payload: eventPayload };
     const engine = new WorkflowEngine();
-    let result;
-    let workflowDefinition: WorkflowDefinition | null = null;
-
-    if (definition) {
-      const definitionJson = JSON.parse(definition.definitionJson) as Record<string, unknown>;
-      workflowDefinition = {
-        name: definition.name,
-        version: definition.version,
-        triggers: JSON.parse(definition.triggerEvents) as string[],
-        inputSchema: {} as never,
-        steps: (definitionJson.steps ?? []) as never[]
-      };
-      result = engine.signalRun(runData, workflowEvent, workflowDefinition);
-    } else {
-      result = engine.signalRun(runData, workflowEvent);
-    }
+    const workflowDefinition = await this.resolveDefinition(run.definitionName);
+    const result = engine.signalRun(runData, workflowEvent, workflowDefinition ?? undefined);
 
     await this.updateRun(run.id, result);
     await this.applyEffects(run.id, result.effects, result.nextRun, workflowDefinition);
@@ -233,21 +221,11 @@ export class WorkflowWorker {
         return;
       }
 
-      const definitionName = run.definitionName;
-      const definition = await workflowDefinitionService.getDefinitionByName(this.db, definitionName);
-      if (!definition) {
-        await this.eventBus.markFailed(event.id, `WorkflowDefinition not found: ${definitionName}`);
+      const workflowDefinition = await this.resolveDefinition(run.definitionName);
+      if (!workflowDefinition) {
+        await this.eventBus.markFailed(event.id, `WorkflowDefinition not found: ${run.definitionName}`);
         return;
       }
-
-      const definitionJson = JSON.parse(definition.definitionJson) as Record<string, unknown>;
-      const workflowDefinition: WorkflowDefinition = {
-        name: definition.name,
-        version: definition.version,
-        triggers: JSON.parse(definition.triggerEvents) as string[],
-        inputSchema: {} as never,
-        steps: (definitionJson.steps ?? []) as never[]
-      };
 
       const runData = this.convertRunToSchema(run);
       const handler = new StepExecutionHandler(this.db, this.planningDatabaseUrl);
@@ -351,6 +329,25 @@ export class WorkflowWorker {
       const errorMsg = error instanceof Error ? error.message : String(error);
       await this.eventBus.markFailed(event.id, `Planning work item status changed handler error: ${errorMsg}`);
     }
+  }
+
+  /**
+   * Resolve a WorkflowDefinition by name, preferring the in-memory TypeScript
+   * registry (which preserves JS condition functions) over the DB-serialized version.
+   */
+  private async resolveDefinition(name: string): Promise<WorkflowDefinition | null> {
+    const inMemory = DEFINITION_REGISTRY.get(name);
+    if (inMemory) return inMemory;
+    const dbDef = await workflowDefinitionService.getDefinitionByName(this.db, name);
+    if (!dbDef) return null;
+    const definitionJson = JSON.parse(dbDef.definitionJson) as Record<string, unknown>;
+    return {
+      name: dbDef.name,
+      version: dbDef.version,
+      triggers: JSON.parse(dbDef.triggerEvents) as string[],
+      inputSchema: {} as never,
+      steps: (definitionJson.steps ?? []) as never[]
+    };
   }
 
   private parseEventPayload(payload: string, eventId: string): Record<string, unknown> | null {

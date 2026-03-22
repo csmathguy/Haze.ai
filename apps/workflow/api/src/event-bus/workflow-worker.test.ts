@@ -175,11 +175,11 @@ describe("WorkflowWorker", () => {
     const count = await worker.processBatch();
     expect(count).toBe(1);
 
-    // Event should be marked failed, not processed
+    // Event should be marked processed (with error in metadata) so it doesn't recycle
     const failedEvent = await prisma.workflowEvent.findUnique({
       where: { id: event.id }
     });
-    expect(failedEvent?.processedAt).toBeNull();
+    expect(failedEvent?.processedAt).not.toBeNull();
     expect(failedEvent?.metadata).toBeDefined();
   });
 

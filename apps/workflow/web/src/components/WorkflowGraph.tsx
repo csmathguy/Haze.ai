@@ -48,14 +48,17 @@ interface CustomNodeData extends Record<string, unknown> {
 }
 
 const getDefaultNodeColor = (stepType: WorkflowStep["type"]): string => {
-  const colors: Record<WorkflowStep["type"], string> = {
+  const colors: Partial<Record<WorkflowStep["type"], string>> = {
+    command: "primary.main",
     deterministic: "primary.main",
     agent: "secondary.main",
     approval: "warning.dark",
     condition: "warning.main",
+    parallel: "info.main",
+    "context-pack": "info.dark",
     wait: "success.main"
   };
-  return colors[stepType];
+  return colors[stepType] ?? "text.disabled";
 };
 
 const getStatusNodeColor = (status: string): string => {
@@ -108,14 +111,82 @@ function getStepRunByStepId(
   return runOverlay.stepRuns.find((sr) => sr.stepId === stepId);
 }
 
+/**
+ * Recursively collect all steps from the definition, including steps nested
+ * inside condition branches and parallel branches.
+ */
+function collectAllSteps(steps: WorkflowStep[]): WorkflowStep[] {
+  const result: WorkflowStep[] = [];
+  for (const step of steps) {
+    result.push(step);
+    if (step.trueBranch) result.push(...collectAllSteps(step.trueBranch));
+    if (step.falseBranch) result.push(...collectAllSteps(step.falseBranch));
+    if (Array.isArray(step.branches)) {
+      for (const branch of step.branches) {
+        result.push(...collectAllSteps(branch));
+      }
+    }
+  }
+  return result;
+}
+
+interface BranchEdgeArgs {
+  sourceId: string;
+  edgeLabel: string;
+  branch: WorkflowStep[];
+  followingId: string | null;
+}
+
+function addOneBranchEdge(args: BranchEdgeArgs, edges: Edge[]): void {
+  const { sourceId, edgeLabel, branch, followingId } = args;
+  const branchFirst = branch[0]?.id ?? null;
+  if (branchFirst) {
+    edges.push({ id: `${sourceId}-${edgeLabel}`, source: sourceId, target: branchFirst, label: edgeLabel, animated: false });
+    buildEdgesForSequence(branch, edges, followingId);
+  } else if (followingId) {
+    edges.push({ id: `${sourceId}-skip-${edgeLabel}`, source: sourceId, target: followingId, label: edgeLabel, animated: false });
+  }
+}
+
+function addConditionEdges(step: WorkflowStep, edges: Edge[], followingId: string | null): void {
+  addOneBranchEdge({ sourceId: step.id, edgeLabel: "true", branch: step.trueBranch ?? [], followingId }, edges);
+  addOneBranchEdge({ sourceId: step.id, edgeLabel: "false", branch: step.falseBranch ?? [], followingId }, edges);
+}
+
+function addParallelEdges(step: WorkflowStep, edges: Edge[], followingId: string | null): void {
+  if (!Array.isArray(step.branches)) return;
+  step.branches.forEach((branch, idx) => {
+    addOneBranchEdge({ sourceId: step.id, edgeLabel: `branch-${String(idx)}`, branch, followingId }, edges);
+  });
+}
+
+function addStepEdges(step: WorkflowStep, edges: Edge[], followingId: string | null): void {
+  if (step.trueBranch !== undefined || step.falseBranch !== undefined) {
+    addConditionEdges(step, edges, followingId);
+  } else if (Array.isArray(step.branches) && step.branches.length > 0) {
+    addParallelEdges(step, edges, followingId);
+  } else if (followingId) {
+    edges.push({ id: `${step.id}-${followingId}`, source: step.id, target: followingId, animated: false });
+  }
+}
+
+function buildEdgesForSequence(steps: WorkflowStep[], edges: Edge[], nextStepId: string | null): void {
+  steps.forEach((step, i) => {
+    const followingId = i + 1 < steps.length ? (steps[i + 1]?.id ?? null) : nextStepId;
+    addStepEdges(step, edges, followingId);
+  });
+}
+
 function buildNodesAndEdges(
   definition: WorkflowDefinition,
   runOverlay: WorkflowRunOverlay | undefined
 ): { nodes: Node[]; edges: Edge[] } {
   const definitionData = JSON.parse(definition.definitionJson) as Record<string, unknown>;
-  const steps = (definitionData.steps as WorkflowStep[] | undefined) ?? [];
+  const topLevelSteps = (definitionData.steps as WorkflowStep[] | undefined) ?? [];
 
-  const nodes: Node[] = steps.map((step) => ({
+  const allSteps = collectAllSteps(topLevelSteps);
+
+  const nodes: Node[] = allSteps.map((step) => ({
     id: step.id,
     data: {
       step,
@@ -127,26 +198,7 @@ function buildNodesAndEdges(
   }));
 
   const edges: Edge[] = [];
-  steps.forEach((step) => {
-    if (step.branches) {
-      Object.entries(step.branches).forEach(([condition, targetId]) => {
-        edges.push({
-          id: `${step.id}-${targetId}`,
-          source: step.id,
-          target: targetId,
-          label: condition,
-          animated: false
-        });
-      });
-    } else if (step.nextStep) {
-      edges.push({
-        id: `${step.id}-${step.nextStep}`,
-        source: step.id,
-        target: step.nextStep,
-        animated: false
-      });
-    }
-  });
+  buildEdgesForSequence(topLevelSteps, edges, null);
 
   const layoutNodes = applyDagreLayout(nodes, edges);
   return { nodes: layoutNodes, edges };
@@ -165,10 +217,13 @@ const CustomNode: React.FC<{ data: CustomNodeData }> = ({ data }) => {
 
   const getNodeIcon = () => {
     switch (step.type) {
+      case "command":
       case "deterministic": return <CodeIcon fontSize="small" />;
-      case "agent": return <AgentIcon fontSize="small" />;
+      case "agent":
+      case "context-pack": return <AgentIcon fontSize="small" />;
       case "approval": return <ApprovalIcon fontSize="small" />;
       case "condition": return <HelpIcon fontSize="small" />;
+      case "parallel":
       case "wait": return <WaitIcon fontSize="small" />;
       default: return null;
     }
@@ -239,7 +294,7 @@ export const WorkflowGraph: React.FC<WorkflowGraphProps> = ({ definition, runOve
   };
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box sx={{ width: "100%", height: 640 }}>
       <Box sx={{ height: 600, width: "100%", position: "relative" }}>
         <ReactFlow
           nodes={nodes}

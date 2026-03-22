@@ -1,14 +1,21 @@
+/** Raw step shape as stored in definitionJson — covers all step types. */
 export interface WorkflowStep {
   id: string;
-  type: "deterministic" | "agent" | "approval" | "condition" | "wait";
+  type: "command" | "agent" | "approval" | "condition" | "parallel" | "context-pack" | "wait" | "deterministic";
   label: string;
+  // command / agent fields
   scriptPath?: string;
   args?: string[];
-  agentName?: string;
+  agentId?: string;
   model?: string;
-  skills?: string[];
-  timeout?: number;
+  skillIds?: string[];
+  timeoutMs?: number;
   retryPolicy?: Record<string, unknown>;
-  branches?: Record<string, string>;
+  // condition step
+  trueBranch?: WorkflowStep[];
+  falseBranch?: WorkflowStep[];
+  // parallel step
+  branches?: WorkflowStep[][];
+  // legacy flat format (condition branches as map)
   nextStep?: string;
 }

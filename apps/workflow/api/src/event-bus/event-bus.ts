@@ -34,6 +34,7 @@ export class EventBus {
     await this.db.workflowEvent.update({
       where: { id: eventId },
       data: {
+        processedAt: new Date(),
         metadata: JSON.stringify({ error })
       }
     });
