@@ -200,7 +200,8 @@ export const WorkflowDefinitionSchema: z.ZodType = z.lazy(() =>
       maxRetries: z.number().int().nonnegative(),
       backoffMs: z.number().int().nonnegative()
     }).optional(),
-    timeoutMs: z.number().int().positive().optional()
+    timeoutMs: z.number().int().positive().optional(),
+    maxTokensBudget: z.number().int().positive().optional()
   })
 );
 export interface WorkflowDefinition {
@@ -214,6 +215,7 @@ export interface WorkflowDefinition {
     backoffMs: number;
   };
   timeoutMs?: number;
+  maxTokensBudget?: number;
 }
 
 // ============================================================================

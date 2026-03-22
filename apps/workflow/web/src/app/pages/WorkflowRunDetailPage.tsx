@@ -17,7 +17,7 @@ import {
   TableHead,
   TableRow
 } from "@mui/material";
-import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
+import { ArrowBack as ArrowBackIcon, Pause as PauseIcon, Cancel as CancelIcon } from "@mui/icons-material";
 
 import { getWorkflowDefinition, getWorkflowRun, type WorkflowRun, type WorkflowDefinition, type WorkflowStepRun } from "../api.js";
 import { WorkflowGraph } from "../../components/WorkflowGraph.js";
@@ -288,6 +288,83 @@ const useFetchWorkflowRun = (id: string | undefined) => {
   return { run, loading, error };
 };
 
+const useRunActions = (id: string | undefined) => {
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const handlePause = async (): Promise<void> => {
+    if (!id) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const response = await fetch(`/api/workflow/runs/${id}/pause`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!response.ok) throw new Error(`Failed to pause run: ${response.status.toString()}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to pause run");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancel = async (): Promise<void> => {
+    if (!id) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const response = await fetch(`/api/workflow/runs/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!response.ok) throw new Error(`Failed to cancel run: ${response.status.toString()}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to cancel run");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return { actionLoading, actionError, handlePause, handleCancel };
+};
+
+interface RunActionButtonsProps {
+  readonly actionLoading: boolean;
+  readonly handleCancel: () => Promise<void>;
+  readonly handlePause: () => Promise<void>;
+  readonly status: string;
+}
+
+const RunActionButtons: React.FC<RunActionButtonsProps> = ({ actionLoading, handleCancel, handlePause, status }) => {
+  const isActive = status === "running" || status === "pending";
+  if (!isActive) return null;
+
+  return (
+    <Stack direction="row" spacing={1}>
+      <Button
+        variant="outlined"
+        size="small"
+        startIcon={<PauseIcon />}
+        onClick={() => { void handlePause(); }}
+        disabled={actionLoading}
+      >
+        Pause
+      </Button>
+      <Button
+        variant="outlined"
+        size="small"
+        color="error"
+        startIcon={<CancelIcon />}
+        onClick={() => { void handleCancel(); }}
+        disabled={actionLoading}
+      >
+        Cancel
+      </Button>
+    </Stack>
+  );
+};
+
 // ---------------------------------------------------------------------------
 // RunMetadataPanel
 // ---------------------------------------------------------------------------
@@ -335,6 +412,7 @@ export const WorkflowRunDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { run, loading, error } = useFetchWorkflowRun(id);
+  const { actionLoading, actionError, handlePause, handleCancel } = useRunActions(id);
   const [definition, setDefinition] = useState<WorkflowDefinition | null>(null);
   const [loadedDefinitionName, setLoadedDefinitionName] = useState<string | null>(null);
 
@@ -372,10 +450,13 @@ export const WorkflowRunDetailPage: React.FC = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => { navigate("/runs"); }} sx={{ mb: 2 }}>Back</Button>
 
+      {actionError && <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>}
+
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
           <Typography variant="h4">Run Details</Typography>
           <Chip label={run.status} color={getStatusColor(run.status)} variant="filled" />
+          <RunActionButtons actionLoading={actionLoading} handleCancel={handleCancel} handlePause={handlePause} status={run.status} />
         </Box>
 
         <RunMetadataPanel run={run} />

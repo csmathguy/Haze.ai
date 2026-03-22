@@ -121,10 +121,9 @@ const workflowStartHeartbeat: CommandStep = {
  *
  * Output is validated against schema (files changed, tests added, refactoring applied, summary).
  *
- * TODO: Once AgentStep schema supports args field, pass acceptanceCriteria and previousAttemptError
- * from input to enrich context for retried implementations:
- *   acceptanceCriteria: "{{input.acceptanceCriteria}}"
- *   previousAttemptError: "{{input.previousAttemptError}}"
+ * Context enrichment: acceptanceCriteria and previousAttemptError are now passed from the
+ * ContextPackStep (phase 1b) into the agent's system prompt context automatically.
+ * The agent receives work item context via the contextPack in the workflow context.
  */
 const implementationStep: AgentStep = {
   type: "agent",
@@ -243,7 +242,7 @@ const validationRetryCheckCondition: ConditionStep = {
     // If any validation step has failed with retries exhausted (indicated by validationFailCount >= 3),
     // this returns true to route to approval gate.
     // For now, we track this as 0 until the engine reports failure after all retries.
-    const failCount = (context.validationFailCount as number) ?? 0;
+    const failCount = Number(context.validationFailCount) || 0;
     return failCount >= 3;
   },
   trueBranch: [
@@ -400,5 +399,6 @@ export const implementationWorkflow: WorkflowDefinition = {
     maxRetries: 1,
     backoffMs: 3000
   },
-  timeoutMs: 36000000
+  timeoutMs: 36000000,
+  maxTokensBudget: 50000
 };

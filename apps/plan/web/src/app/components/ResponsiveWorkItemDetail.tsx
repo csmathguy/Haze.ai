@@ -6,6 +6,7 @@ import { WorkItemDetail } from "./WorkItemDetail.js";
 interface ResponsiveWorkItemDetailProps {
   readonly onClose: () => void;
   readonly onCriterionToggle: (criterionId: string, isPassed: boolean) => Promise<void>;
+  readonly onStartImplementation?: (workItemId: string) => Promise<void>;
   readonly onStatusChange: (status: WorkItemStatus) => Promise<void>;
   readonly onTaskToggle: (taskId: string, isDone: boolean) => Promise<void>;
   readonly open: boolean;
@@ -15,6 +16,7 @@ interface ResponsiveWorkItemDetailProps {
 export function ResponsiveWorkItemDetail({
   onClose,
   onCriterionToggle,
+  onStartImplementation,
   onStatusChange,
   onTaskToggle,
   open,
@@ -33,6 +35,7 @@ export function ResponsiveWorkItemDetail({
     >
       <WorkItemDetail
         onCriterionToggle={onCriterionToggle}
+        onStartImplementation={onStartImplementation}
         onStatusChange={onStatusChange}
         onTaskToggle={onTaskToggle}
         surface="plain"

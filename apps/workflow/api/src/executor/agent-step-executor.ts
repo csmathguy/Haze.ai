@@ -237,6 +237,11 @@ export class AgentStepExecutor {
       return `## Skill: ${s.name}\n${s.description ?? "No description"}`;
     }).join("\n\n---\n\n");
 
+    // Extract contextPack from contextJson if available (from prior ContextPackStep)
+    const contextPack = (run.contextJson as Record<string, unknown> | null)?.contextPack as Record<string, unknown> | undefined;
+    const contextPackInfo = contextPack ? `\n\nWork Item Context:
+${JSON.stringify(contextPack, null, 2)}` : "";
+
     // System prompt with agent context
     const systemPrompt = `You are an agent executing the following step in a workflow.
 
@@ -248,7 +253,7 @@ Available Skills:
 ${skillsSection}
 
 Workflow Context:
-${JSON.stringify(run.contextJson, null, 2)}
+${JSON.stringify(run.contextJson, null, 2)}${contextPackInfo}
 
 Please execute the requested tasks and return structured JSON output.`;
 

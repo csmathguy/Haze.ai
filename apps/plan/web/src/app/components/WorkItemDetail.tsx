@@ -1,4 +1,5 @@
 import {
+  Button,
   Checkbox,
   Chip,
   Divider,
@@ -11,11 +12,13 @@ import {
   TextField,
   Typography
 } from "@mui/material";
+import { PlayArrow as PlayArrowIcon } from "@mui/icons-material";
 import type { WorkItem, WorkItemStatus } from "@taxes/shared";
 
 interface WorkItemDetailProps {
   readonly onCriterionToggle: (criterionId: string, isPassed: boolean) => Promise<void>;
   readonly onStatusChange: (status: WorkItemStatus) => Promise<void>;
+  readonly onStartImplementation?: (workItemId: string) => Promise<void>;
   readonly onTaskToggle: (taskId: string, isDone: boolean) => Promise<void>;
   readonly surface?: "paper" | "plain";
   readonly workItem: WorkItem | null;
@@ -23,6 +26,7 @@ interface WorkItemDetailProps {
 
 export function WorkItemDetail({
   onCriterionToggle,
+  onStartImplementation,
   onStatusChange,
   onTaskToggle,
   surface = "paper",
@@ -40,7 +44,7 @@ export function WorkItemDetail({
 
   const content = (
     <Stack spacing={2.5}>
-      <WorkItemHeader onStatusChange={onStatusChange} workItem={workItem} />
+      <WorkItemHeader onStartImplementation={onStartImplementation} onStatusChange={onStatusChange} workItem={workItem} />
       <Divider />
       <ChecklistSection
         emptyMessage="No tasks yet."
@@ -75,9 +79,22 @@ export function WorkItemDetail({
 }
 
 function WorkItemHeader({
+  onStartImplementation,
   onStatusChange,
   workItem
-}: Pick<WorkItemDetailProps, "onStatusChange"> & { readonly workItem: WorkItem }) {
+}: Pick<WorkItemDetailProps, "onStartImplementation" | "onStatusChange"> & { readonly workItem: WorkItem }) {
+  const [implementationLoading, setImplementationLoading] = React.useState(false);
+
+  const handleStartImplementation = async (): Promise<void> => {
+    if (!onStartImplementation) return;
+    setImplementationLoading(true);
+    try {
+      await onStartImplementation(workItem.id);
+    } finally {
+      setImplementationLoading(false);
+    }
+  };
+
   return (
     <Stack spacing={1.5}>
       <Stack spacing={1}>
@@ -87,21 +104,33 @@ function WorkItemHeader({
         </Typography>
         <WorkItemMetaChips workItem={workItem} />
       </Stack>
-      <TextField
-        label="Status"
-        onChange={(event) => {
-          void onStatusChange(event.target.value as WorkItemStatus);
-        }}
-        select
-        sx={{ maxWidth: 240, width: { sm: 240, xs: "100%" } }}
-        value={workItem.status}
-      >
-        {["backlog", "planning", "ready", "in-progress", "blocked", "done", "archived"].map((status) => (
-          <MenuItem key={status} value={status}>
-            {status}
-          </MenuItem>
-        ))}
-      </TextField>
+      <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", flexWrap: "wrap" }}>
+        <TextField
+          label="Status"
+          onChange={(event) => {
+            void onStatusChange(event.target.value as WorkItemStatus);
+          }}
+          select
+          sx={{ maxWidth: 240, width: { sm: 240, xs: "100%" } }}
+          value={workItem.status}
+        >
+          {["backlog", "planning", "ready", "in-progress", "blocked", "done", "archived"].map((status) => (
+            <MenuItem key={status} value={status}>
+              {status}
+            </MenuItem>
+          ))}
+        </TextField>
+        {onStartImplementation && (
+          <Button
+            variant="contained"
+            startIcon={<PlayArrowIcon />}
+            onClick={() => { void handleStartImplementation(); }}
+            disabled={implementationLoading}
+          >
+            Start Implementation
+          </Button>
+        )}
+      </Stack>
     </Stack>
   );
 }

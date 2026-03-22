@@ -202,6 +202,26 @@ function registerRunDetailRoutes(app: FastifyInstance, databaseUrl?: string): vo
       throw error;
     }
   });
+
+  app.patch("/api/workflow/runs/:id/pause", async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = z.object({ id: z.string() }).parse(request.params);
+      const prisma = await getWorkflowPrismaClient(databaseUrl);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        const run = await (prisma as any).workflowRun.update({
+          where: { id },
+          data: { status: "paused", updatedAt: new Date() }
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        return { run };
+      } finally { await prisma.$disconnect(); }
+    } catch (error) {
+      if (error instanceof z.ZodError) { reply.code(400); return { error: "Invalid request params", details: error.issues }; }
+      if (error instanceof Error && error.message.includes("not found")) { reply.code(404); return { error: error.message }; }
+      throw error;
+    }
+  });
 }
 
 function registerStepRunRoutes(app: FastifyInstance, databaseUrl?: string): void {
