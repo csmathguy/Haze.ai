@@ -62,7 +62,7 @@ async function loadWorkItemDetails(
     title: workItem.title,
     summary: workItem.summary,
     acceptanceCriteria: Array.isArray(workItem.acceptanceCriteria)
-      ? extractStrings(workItem.acceptanceCriteria as unknown[], "criterion")
+      ? extractStrings(workItem.acceptanceCriteria as unknown[], "title")
       : [],
     tasks: Array.isArray(workItem.tasks)
       ? extractStrings(workItem.tasks as unknown[], "title")
@@ -135,11 +135,13 @@ export async function executeContextPackStep(input: ContextPackInput): Promise<C
 
   let workItemContext: WorkItemContext = { title: workItemId, summary: "", acceptanceCriteria: [], tasks: [] };
   if (planningDatabaseUrl) {
-    try {
-      workItemContext = await loadWorkItemDetails(workItemId, planningDatabaseUrl);
-    } catch (error) {
-      console.warn(`Failed to load work item ${workItemId}: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    workItemContext = await loadWorkItemDetails(workItemId, planningDatabaseUrl);
+  } else {
+    throw new Error(`No planning database URL configured — cannot load work item ${workItemId}. Set PLANNING_DATABASE_URL or ensure the planning DB exists at ~/.taxes/planning/sqlite/planning.db`);
+  }
+
+  if (!workItemContext.summary) {
+    throw new Error(`Work item ${workItemId} has no summary in the planning database. Add a summary before starting the workflow.`);
   }
 
   const { diff: gitDiff, changedFiles } = gatherGitContext(step);
