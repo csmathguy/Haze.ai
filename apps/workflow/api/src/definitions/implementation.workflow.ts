@@ -140,7 +140,7 @@ const implementationStep: AgentStep = {
   id: "phase-3-implement",
   label: "Phase 3: Implement changes (red-green-refactor)",
   agentId: "implementer",
-  model: "claude-sonnet-4-6",
+  model: "claude-haiku-4-5-20251001",
   providerFamily: "anthropic",
   runtimeKind: "claude-code-subagent",
   skillIds: ["implementation-workflow"],

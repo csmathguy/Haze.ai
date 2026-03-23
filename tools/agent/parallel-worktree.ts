@@ -63,6 +63,31 @@ async function main(): Promise<void> {
   process.stdout.write(`${formatSummary(plan)}\n`);
 }
 
+function removeWorktreeDirectory(worktreePath: string): void {
+  // On Windows, node_modules junctions and locked files can block rmSync.
+  // First try to remove the node_modules junction specifically (not its contents),
+  // then remove the rest. Use cmd.exe rd as a last resort.
+  const nodeModulesPath = path.join(worktreePath, "node_modules");
+  try {
+    rmSync(nodeModulesPath, { force: true });
+  } catch {
+    // Junction removal failed — not fatal, rd will handle it
+  }
+  try {
+    rmSync(worktreePath, { force: true, recursive: true });
+  } catch {
+    // Fall back to cmd.exe rd /s /q which can remove junctions Windows-style
+    if (process.platform === "win32") {
+      try {
+        execFileSync("cmd.exe", ["/c", "rd", "/s", "/q", worktreePath], { stdio: "inherit" });
+      } catch {
+        // If rd also fails a process has the directory locked — warn and continue
+        process.stderr.write(`[worktree] WARNING: could not remove ${worktreePath}. A process may still be running inside it. Kill any active claude or node processes in that directory and retry.\n`);
+      }
+    }
+  }
+}
+
 function removeWorktree(repoRoot: string, worktreePath: string, branchName: string): void {
   try {
     execFileSync("git", ["worktree", "remove", "--force", worktreePath], {
@@ -70,8 +95,8 @@ function removeWorktree(repoRoot: string, worktreePath: string, branchName: stri
       stdio: "inherit"
     });
   } catch {
-    // If worktree remove fails (e.g. directory is not a registered worktree), fall back to rm
-    rmSync(worktreePath, { force: true, recursive: true });
+    // If worktree remove fails (e.g. directory is not a registered worktree), fall back
+    removeWorktreeDirectory(worktreePath);
   }
 
   try {
