@@ -52,6 +52,7 @@ interface SpawnCliOptions {
   readonly runtimeKind: string;
   readonly providerFamily: string;
   readonly prompt: string;
+  readonly model?: string;
   readonly timeoutMs: number;
   readonly cwd?: string;
 }
@@ -138,6 +139,7 @@ export class AgentStepExecutor {
       runtimeKind,
       providerFamily,
       prompt,
+      model: step.model,
       timeoutMs: step.timeoutMs ?? 120000,
       ...(worktreePath !== undefined && { cwd: worktreePath })
     });
@@ -345,11 +347,12 @@ Do not include any text before or after the JSON. Do not wrap it in markdown cod
    * Returns both stdout lines and stderr for full observability.
    */
   private async spawnCli(options: SpawnCliOptions): Promise<CliOutput> {
-    const { runtimeKind, providerFamily, prompt, timeoutMs, cwd } = options;
+    const { runtimeKind, providerFamily, prompt, model, timeoutMs, cwd } = options;
     const { command, args } = this.getCliCommandAndArgs(
       runtimeKind,
       providerFamily,
-      prompt
+      prompt,
+      model
     );
 
     return new Promise<CliOutput>((resolve, reject) => {
@@ -410,9 +413,11 @@ Do not include any text before or after the JSON. Do not wrap it in markdown cod
   private getCliCommandAndArgs(
     runtimeKind: string,
     providerFamily: string,
-    prompt: string
+    prompt: string,
+    model?: string
   ): { command: string; args: string[] } {
     if (providerFamily === "anthropic" && runtimeKind === "claude-code-subagent") {
+      const modelArgs = model ? ["--model", model] : [];
       // On Windows, "claude" is installed as claude.cmd (a batch file) and cannot be spawned
       // directly without shell:true. To avoid shell-quoting the prompt (which may contain
       // special characters), we invoke cmd.exe explicitly with /c so that args are passed
@@ -420,12 +425,12 @@ Do not include any text before or after the JSON. Do not wrap it in markdown cod
       if (process.platform === "win32") {
         return {
           command: "cmd.exe",
-          args: ["/c", "claude.cmd", "-p", prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"]
+          args: ["/c", "claude.cmd", "-p", prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions", ...modelArgs]
         };
       }
       return {
         command: "claude",
-        args: ["-p", prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"]
+        args: ["-p", prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions", ...modelArgs]
       };
     }
     if (providerFamily === "openai" && runtimeKind === "codex-subagent") {
