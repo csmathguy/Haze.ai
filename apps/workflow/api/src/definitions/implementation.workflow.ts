@@ -46,14 +46,8 @@ const planningCheckCondition: ConditionStep = {
       type: "command",
       id: "phase-1-log-planning",
       label: "Log planning phase start",
-      scriptPath: "npm",
-      args: [
-        "run",
-        "agent:heartbeat",
-        "--",
-        "--message",
-        "Phase 1: Planning verified - proceeding to setup"
-      ]
+      scriptPath: "node",
+      args: ["-e", "process.stdout.write('Phase 1: Planning verified - proceeding to setup\\n')"]
     } as CommandStep
   ],
   falseBranch: [
@@ -110,14 +104,8 @@ const workflowStartHeartbeat: CommandStep = {
   type: "command",
   id: "phase-2-heartbeat",
   label: "Phase 2: Log workflow start confirmation",
-  scriptPath: "npm",
-  args: [
-    "run",
-    "agent:heartbeat",
-    "--",
-    "--message",
-    "Phase 2: Worktree created for {{input.workItemId}}"
-  ]
+  scriptPath: "node",
+  args: ["-e", "process.stdout.write('Phase 2: Worktree created for {{input.workItemId}}\\n')"]
 };
 
 // Phase 2c: Capture worktree path into contextJson so all subsequent steps run in the worktree.
@@ -152,7 +140,7 @@ const implementationStep: AgentStep = {
   id: "phase-3-implement",
   label: "Phase 3: Implement changes (red-green-refactor)",
   agentId: "implementer",
-  model: "claude-sonnet-4.6-20250514",
+  model: "claude-sonnet-4-6",
   providerFamily: "anthropic",
   runtimeKind: "claude-code-subagent",
   skillIds: ["implementation-workflow"],
